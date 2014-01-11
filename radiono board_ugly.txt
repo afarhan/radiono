@@ -1,0 +1,35 @@
+arudino controller for transceivers
+
+
+I/O PIN 
+    1     RESET 10K pull up, 0.1 to RTS?
+0   2     SERIAL RX
+1   3     SERIAL TX
+2   4     LSB/USB (yellow)
+3   5     T/R (bi-directional) (green)
+4   6     CW Tone (brown)
+    7     VCC
+	8     GND
+	9     XTAL
+	10    XTAL
+5   11    BANDSWITCH A (15 MHz and above)
+6   12    BANDSWITCH B
+7   13    BANDSWITCH C
+8   14    LCD D7   LCD PIN 14 
+9   15    LCD D6   LCD PIN 13
+10  16    LCD D5   LCD PIN 12
+11  17    LCD D4   LCD PIN 11
+12  18    LCD E    LCD PIN 6; LCD D6   LCD PIN 13
+13  19    LCD RS   LCD PIN 4; R/W is permanently grounded     LCD PIN 5
+    20    VCC A
+    21    NC
+    22    GND A
+A0  23   NC   (Narrow/Wide switch?)
+A1  24   Keyer (1K pull up, 2,2K, 1K pull downs, short on straight key) (blue in the bundle)
+A2  25   TUNING POT
+A3  26   Function Switch
+A4  27 SDA (Si570) PIN 7 (top)
+A5  28 SDC (Si570) PIN 8 (bottom)
+
+
+LCD (16 x 2)
