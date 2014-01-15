@@ -4,7 +4,7 @@
 #include "Wire.h"
 #include <avr/io.h> 
 #include <stdlib.h> 
-#include "dds.h"
+
 
 /*
  The 16x2 LCD is connected as follows:
@@ -14,16 +14,7 @@
     11          10             D4           17
     12          11             D5           16
     13           9             D6           15
-    14           8             D7           14
-  
- The DDS is connected up as follows  
- DDS PIN 
-DDS's PIN         Raduino's PIN     ATMEGA328's PIN
-4 DDS DATA        5                  11   
-3 DDS LATCH       6                  12    
-2 DDS CLCK        7                  13
-
- 
+    14           8             D7           14 
    
 */
 
