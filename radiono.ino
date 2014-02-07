@@ -314,6 +314,9 @@ void setup() {
   printLine1("Raduino v0.02 "); 
 
   Wire.begin();
+  // Disable internal pullups
+  digitalWrite(SDA, 0);
+  digitalWrite(SCL, 0);
 
   // Force Si570 to reset to initial freq
   i2c_write(si570_i2c_address,135,0x01);
