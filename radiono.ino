@@ -1,6 +1,4 @@
 #include <LiquidCrystal.h>
-#include <Boards.h>
-#include <Firmata.h>
 #include "Wire.h"
 #include <avr/io.h> 
 #include <stdlib.h> 
