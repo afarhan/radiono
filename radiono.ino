@@ -6,13 +6,12 @@
  * Copyright 2013 - Ashar Farhan
  */
 
-
-#include <LiquidCrystal.h>
 /*
  * Wire is only used from the Si570 module but we need to list it here so that
  * the Arduino environment knows we need it.
  */
 #include <Wire.h>
+#include <LiquidCrystal.h>
 
 #include <avr/io.h>
 #include <stdlib.h>
@@ -37,7 +36,9 @@ unsigned long frequency = 14200000;
 unsigned long vfoA=14200000L, vfoB=14200000L, ritA, ritB;
 unsigned long cwTimeout = 0;
 
+Si570 *vfo;
 LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
+
 int count = 0;
 char b[20], c[20], printBuff[32];
 
@@ -63,14 +64,11 @@ unsigned char locked = 0; //the tuning can be locked: wait until it goes into de
 #define VFO_A 0
 #define VFO_B 1
 
-Si570 *dco;
-
 char inTx = 0;
 char keyDown = 0;
 char isLSB = 0;
 char isRIT = 0;
 char vfoActive = VFO_A;
-/* si570 related routines */
 /* modes */
 unsigned char isManual = 1;
 unsigned ritOn = 0;
@@ -106,28 +104,19 @@ void updateDisplay(){
     sprintf(b, "%08ld", frequency);
     sprintf(c, "%s:%.2s.%.4s %s", vfoActive == VFO_A ? " A" : " B" , b,  b+2, ritOn ? "+RX" : "   ");
     printLine1(c);
-    sprintf(c, "%s %s %d", isLSB ? "LSB" : "USB", inTx ? " TX" : " RX", dco->status);
+    sprintf(c, "%s %s %d", isLSB ? "LSB" : "USB", inTx ? " TX" : " RX", vfo->status);
     printLine2(c);
 }
-
-
 
 void setup() {
   lcd.begin(16, 2);
   printBuff[0] = 0;
   printLine1("Raduino v0.02 ");
 
-  dco = new Si570(SI570_I2C_ADDRESS);
-  /*
-  sprintf(c, "%02x %02x %02x ", dco_reg[7], dco_reg[8], dco_reg[9]);
-  printLine1(c);
-
-  sprintf(c, "%02x %02x %02x ", dco_reg[10], dco_reg[11], dco_reg[12]);
-  printLine2(c);
-  */
+  vfo = new Si570(SI570_I2C_ADDRESS);
 
   //set the initial frequency
-  dco->setFrequency(26150000L);
+  vfo->setFrequency(26150000L);
 
   //set up the pins
   pinMode(LSB, OUTPUT);
@@ -368,9 +357,6 @@ void checkButton(){
     refreshDisplay++;
   }
 
-//  sprintf(c, "t1=%d, t2=%d ", t1, t2);
-//  printLine2(c);
-
   while (btnDown() == 1){
      delay(50);
   }
@@ -387,7 +373,7 @@ void loop(){
   checkTX();
   checkButton();
 
-  dco->setFrequency(frequency + IF_FREQ);
+  vfo->setFrequency(frequency + IF_FREQ);
 
   setSideband();
   setBandswitch();
@@ -395,7 +381,6 @@ void loop(){
   if (refreshDisplay){
     updateDisplay();
     refreshDisplay = 0;
-//    delay(10);
   }
 }
 
