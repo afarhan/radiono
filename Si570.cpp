@@ -12,9 +12,16 @@
 
 #include "Si570.h"
 
-#define FREQ_XTAL (114292532l)
+static void debug(char const *fmt, ... ) {
+  char tmp[128]; // resulting string limited to 128 chars
+  va_list args;
+  va_start (args, fmt );
+  vsnprintf(tmp, sizeof(tmp), fmt, args);
+  va_end (args);
+  Serial.println(tmp);
+}
 
-Si570::Si570(char si570_address) {
+Si570::Si570(uint8_t si570_address, uint32_t calibration_frequency) {
   i2c_address = si570_address;
 
   Wire.begin();
@@ -25,57 +32,145 @@ Si570::Si570(char si570_address) {
 
   f_center = 0;
   frequency = 0;
-  // TODO: make that configurable
-  freq_xtal = FREQ_XTAL;
+
   // Force Si570 to reset to initial freq
   i2c_write(135,0x01);
   delay(20);
-  read_si570();
+  if (read_si570()) {
+    debug("Successfully initialized Si570");
+
+    freq_xtal = (uint64_t)calibration_frequency * getHsDiv() * getN1() / getRfReqDouble();
+    status = SI570_READY;
+
+    //debugSi570();
+  }
+  else {
+    debug("Unable to properly initialize Si570");
+    status = SI570_ERROR;
+    // Use the factory default if we were unable to talk to the chip
+    freq_xtal = 114285000l;
+  }
 }
 
-void Si570::i2c_write(char reg_address, char data) {
-  int rdata = data;
+void Si570::debugSi570() {
+  debug(" --- Si570 Debug Info ---");
+  debug("Crystal frequency calibrated at: %lu", freq_xtal);
+  debug("Status: %i", status);
+  for (int i = 7; i < 15; i++) {
+    debug("Register[%i] = %02x", i, dco_reg[i]);
+  }
+  debug("HsDivider = %i  N1 = %i", getHsDiv(), getN1());
+  debug("Reference Frequency (hex)   : %04lx%04lx", (uint32_t)(getRfReq() >> 32), (uint32_t)(getRfReq() & 0xffffffff));
+
+  char freq_string[10];
+  dtostrf(getRfReqDouble(), -8, 3, freq_string);
+  debug("Reference Frequency (double): %s", freq_string);
+}
+
+uint8_t Si570::getHsDiv() {
+  uint8_t hs_reg_value = this->dco_reg[7] >> 5;
+
+  return 4 + hs_reg_value;
+}
+
+uint8_t Si570::getN1() {
+  uint8_t n_reg_value = ((this->dco_reg[7] & 0x1F) << 2) + (this->dco_reg[8] >> 6);
+  return n_reg_value + 1;
+}
+
+uint64_t Si570::getRfReq() {
+  uint64_t dcoFrequency = 0;
+
+  dcoFrequency =  (uint64_t)(this->dco_reg[8] & 0x3F) << 32;
+  dcoFrequency |= (uint64_t)this->dco_reg[9]  << 24;
+  dcoFrequency |= (uint64_t)this->dco_reg[10] << 16;
+  dcoFrequency |= this->dco_reg[11] << 8;
+  dcoFrequency |= this->dco_reg[12];
+
+  return dcoFrequency;
+}
+
+double Si570::getRfReqDouble() {
+  return ((double) getRfReq() / ((uint64_t)1 << 28));
+}
+
+void Si570::i2c_write(uint8_t reg_address, uint8_t data) {
   Wire.beginTransmission(this->i2c_address);
   Wire.write(reg_address);
-  Wire.write(rdata);
+  Wire.write(data);
   Wire.endTransmission();
 }
 
-char Si570::i2c_read(int reg_address) {
-  unsigned char rdata = 0xFF;
+int Si570::i2c_write(uint8_t reg_address, uint8_t *data, uint8_t length) {
+  Wire.beginTransmission(this->i2c_address);
+  Wire.write(reg_address);
+  Wire.write(data, length);
+
+  int error = Wire.endTransmission();
+  if (error != 0) {
+    debug("Error writing %i bytes to register %i: %i", length, reg_address, error);
+    return -1;
+  }
+  return length;
+}
+
+uint8_t Si570::i2c_read(uint8_t reg_address) {
+  uint8_t rdata = 0xFF;
+  Wire.beginTransmission(this->i2c_address);
+  Wire.write(reg_address);
   Wire.beginTransmission(this->i2c_address);
   Wire.write(reg_address);
   Wire.endTransmission();
-  Wire.requestFrom(this->i2c_address,1);
+  Wire.requestFrom(this->i2c_address, (uint8_t)1);
   if (Wire.available()) rdata = Wire.read();
   return rdata;
 }
 
-void Si570::read_si570(){
-  //we have to read eight consecutive registers starting at register 5
-  for (int i = 7; i <= 12; i++)
-    this->dco_reg[i] = i2c_read(i);
+int Si570::i2c_read(uint8_t reg_address, uint8_t *output, uint8_t length) {
+  Wire.beginTransmission(this->i2c_address);
+  Wire.write(reg_address);
+
+  int error = Wire.endTransmission();
+  if (error != 0) {
+    debug("Error reading %i bytes from register %i. endTransmission() returned %i", reg_address, error);
+    return 0;
+  }
+
+  int len = Wire.requestFrom(this->i2c_address,length);
+  if (len != length) {
+    debug("Requested %i bytes and only got %i bytes", length, len);
+  }
+  for (int i = 0; i < len && Wire.available(); i++)
+    output[i] = Wire.read();
+
+  return len;
+}
+
+bool Si570::read_si570(){
+  // Try 3 times to read the registers
+  for (int i = 0; i < 3; i++) {
+    //we have to read eight consecutive registers starting at register 7
+    if (i2c_read(7, &(dco_reg[7]), 6) == 6) {
+      return true;
+    }
+    debug("Error reading Si570 registers... Retrying.");
+    delay(50);
+  }
+  return false;
 }
 
 void Si570::write_si570()
 {
-  int idco, i;
+  int idco;
 
   // Freeze DCO
   idco = i2c_read(137);
   i2c_write(137, idco | 0x10 );
 
-  i2c_write(7, this->dco_reg[7]);
-
-  //Set Registers
-  for( i=7; i <= 12; i++){
-    i2c_write(i, this->dco_reg[i]);
-    idco = i2c_read(i);
-  }
+  i2c_write(7, &dco_reg[7], 6);
 
   // Unfreeze DCO
-  idco = i2c_read(137);
-  i2c_write (137, idco & 0xEF );
+  i2c_write(137, idco & 0xEF);
 
   // Set new freq
   i2c_write(135,0x40);
@@ -83,12 +178,11 @@ void Si570::write_si570()
 
 void Si570::qwrite_si570()
 {
-  int i, idco;
-  //Set Registers
-  for( i=8; i <= 12; i++){
-    i2c_write(i, this->dco_reg[i]);
-    idco = i2c_read(i);
-  }
+  // FIXME: Datasheet recommends freezing the "M Control Word" while writing registers
+  // to avoid small changes in between each write.
+  // See page 24 - bit5 of register 135.
+
+  i2c_write(7, &dco_reg[7], 6);
 }
 
 void Si570::setBitvals(void){
@@ -205,12 +299,18 @@ Si570_Status Si570::setFrequency(unsigned long newfreq) {
   if (this->frequency == newfreq)
     return this->status;
 
+  unsigned long delta_freq;
+  if (newfreq > this->f_center)
+    delta_freq = newfreq - this->f_center;
+  else
+    delta_freq = this->f_center - newfreq;
+
   //if the jump is small enough, we don't have to fiddle with the dividers
-  if (abs(this->f_center - newfreq) < 50000L) {
+  if (delta_freq < 50000L) {
     setRfreq(newfreq);
     this->frequency = newfreq;
     qwrite_si570();
-    this->status = SUCCESS_SMALLJUMP;
+    this->status = SI570_SUCCESS_SMALLJUMP;
   }
   else {
     //else it is a big jump
@@ -218,7 +318,7 @@ Si570_Status Si570::setFrequency(unsigned long newfreq) {
     setRfreq(newfreq);
     this->f_center = this->frequency = newfreq;
     write_si570();
-    this->status = SUCCESS_BIGJUMP;
+    this->status = SI570_SUCCESS_BIGJUMP;
   }
   return this->status;
 }

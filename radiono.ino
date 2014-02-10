@@ -76,7 +76,7 @@ unsigned ritOn = 0;
 /* dds ddschip(DDS9850, 5, 6, 7, 125000000LL); */
 
 /* display routines */
-void printLine1(char *c){
+void printLine1(char const *c){
   if (strcmp(c, printBuff)){
     lcd.setCursor(0, 0);
     lcd.print(c);
@@ -85,7 +85,7 @@ void printLine1(char *c){
   }
 }
 
-void printLine2(char *c){
+void printLine2(char const *c){
   lcd.setCursor(0, 1);
   lcd.print(c);
 }
@@ -101,19 +101,38 @@ void displayFrequency(unsigned long f){
 }
 
 void updateDisplay(){
-    sprintf(b, "%08ld", frequency);
-    sprintf(c, "%s:%.2s.%.4s %s", vfoActive == VFO_A ? " A" : " B" , b,  b+2, ritOn ? "+RX" : "   ");
-    printLine1(c);
-    sprintf(c, "%s %s %d", isLSB ? "LSB" : "USB", inTx ? " TX" : " RX", vfo->status);
-    printLine2(c);
+  char const *vfoStatus[] = { "ERR", "RDY", "BIG", "SML" };
+
+  sprintf(b, "%08ld", frequency);
+  sprintf(c, "%s:%.2s.%.4s %s", vfoActive == VFO_A ? " A" : " B" , b,  b+2, ritOn ? "+RX" : "   ");
+  printLine1(c);
+  sprintf(c, "%s %s %s", isLSB ? "LSB" : "USB", inTx ? " TX" : " RX", vfoStatus[vfo->status]);
+  printLine2(c);
 }
 
 void setup() {
+  // Initialize the Serial port so that we can use it for debugging
+  Serial.begin(115200);
+  Serial.println("Radiono starting!");
+
   lcd.begin(16, 2);
   printBuff[0] = 0;
-  printLine1("Raduino v0.02 ");
+  printLine1("Raduino v0.02");
 
-  vfo = new Si570(SI570_I2C_ADDRESS);
+  // The library automatically reads the factory calibration settings of your Si570
+  // but it needs to know for what frequency it was calibrated for.
+  // Looks like most HAM Si570 are calibrated for 56.320 Mhz.
+  // If yours was calibrated for another frequency, you need to change that here
+  vfo = new Si570(SI570_I2C_ADDRESS, 56320000);
+
+  if (vfo->status == SI570_ERROR) {
+    // The Si570 is unreachable. Show an error for 3 seconds and continue.
+    printLine2("Si570 comm error");
+    delay(3000);
+  }
+
+  // This will print some debugging info to the serial console.
+  vfo->debugSi570();
 
   //set the initial frequency
   vfo->setFrequency(26150000L);
@@ -363,8 +382,6 @@ void checkButton(){
 }
 
 void loop(){
-  int t = 0;
-
   readTuningPot();
   checkTuning();
 
