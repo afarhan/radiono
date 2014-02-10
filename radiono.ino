@@ -1,10 +1,21 @@
-#include <LiquidCrystal.h>
-#include <Boards.h>
-#include <Firmata.h>
-#include "Wire.h"
-#include <avr/io.h> 
-#include <stdlib.h> 
+/*
+ * Minima main sketch
+ *
+ * FIXME: License?
+ *
+ * Copyright 2013 - Ashar Farhan
+ */
 
+/*
+ * Wire is only used from the Si570 module but we need to list it here so that
+ * the Arduino environment knows we need it.
+ */
+#include <Wire.h>
+#include <LiquidCrystal.h>
+
+#include <avr/io.h>
+#include <stdlib.h>
+#include "Si570.h"
 
 /*
  The 16x2 LCD is connected as follows:
@@ -14,34 +25,20 @@
     11          10             D4           17
     12          11             D5           16
     13           9             D6           15
-    14           8             D7           14 
-   
+    14           8             D7           14
 */
 
-/* si570 registers and stuff */
-//#define FREQ_XTAL (114 278 453) // my si570's crystal was at 114.78453 MHz
-//#define FREQ_XTAL (114 228 153L)
-
-//lvds
-//#define FREQ_XTAL (114285267)
-//cmos si570
-//#define FREQ_XTAL (1142121701) 
-
-#define FREQ_XTAL (114292532l)
+#define SI570_I2C_ADDRESS 0x55
 #define IF_FREQ   (19997000l) //this is for usb, we should probably have the USB and LSB frequencies separately
 #define CW_TIMEOUT (600l) // in milliseconds, this is the parameter that determines how long the tx will hold between cw key downs
 
-unsigned char si570_i2c_address = 0x55;
-unsigned char dco_reg[13], dco_status='s';
-unsigned long bitval[38];
-unsigned long f_center=0, frequency=14200000, dco_freq=0;
-unsigned int hs, n1;
+unsigned long frequency = 14200000;
 unsigned long vfoA=14200000L, vfoB=14200000L, ritA, ritB;
-unsigned char wasSmall = 1;
 unsigned long cwTimeout = 0;
 
-
+Si570 *vfo;
 LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
+
 int count = 0;
 char b[20], c[20], printBuff[32];
 
@@ -59,7 +56,7 @@ unsigned char locked = 0; //the tuning can be locked: wait until it goes into de
 
 #define BAND_HI (5)
 
-#define FBUTTON (A3) 
+#define FBUTTON (A3)
 #define ANALOG_TUNING (A2)
 #define ANALOG_KEYER (A1)
 
@@ -72,7 +69,6 @@ char keyDown = 0;
 char isLSB = 0;
 char isRIT = 0;
 char vfoActive = VFO_A;
-/* si570 related routines */
 /* modes */
 unsigned char isManual = 1;
 unsigned ritOn = 0;
@@ -80,7 +76,7 @@ unsigned ritOn = 0;
 /* dds ddschip(DDS9850, 5, 6, 7, 125000000LL); */
 
 /* display routines */
-void printLine1(char *c){
+void printLine1(char const *c){
   if (strcmp(c, printBuff)){
     lcd.setCursor(0, 0);
     lcd.print(c);
@@ -89,14 +85,14 @@ void printLine1(char *c){
   }
 }
 
-void printLine2(char *c){
+void printLine2(char const *c){
   lcd.setCursor(0, 1);
   lcd.print(c);
 }
 
 void displayFrequency(unsigned long f){
   int mhz, khz, hz;
-  
+
   mhz = f / 1000000l;
   khz = (f % 1000000l)/1000;
   hz = f % 1000l;
@@ -105,236 +101,47 @@ void displayFrequency(unsigned long f){
 }
 
 void updateDisplay(){
-    sprintf(b, "%08ld", frequency);      
-    sprintf(c, "%s:%.2s.%.4s %s", vfoActive == VFO_A ? " A" : " B" , b,  b+2, ritOn ? "+RX" : "   ");       
-    printLine1(c);
-    sprintf(c, "%s %s %d", isLSB ? "LSB" : "USB", inTx ? " TX" : " RX",  wasSmall);
-    printLine2(c);
+  char const *vfoStatus[] = { "ERR", "RDY", "BIG", "SML" };
+
+  sprintf(b, "%08ld", frequency);
+  sprintf(c, "%s:%.2s.%.4s %s", vfoActive == VFO_A ? " A" : " B" , b,  b+2, ritOn ? "+RX" : "   ");
+  printLine1(c);
+  sprintf(c, "%s %s %s", isLSB ? "LSB" : "USB", inTx ? " TX" : " RX", vfoStatus[vfo->status]);
+  printLine2(c);
 }
 
+void setup() {
+  // Initialize the Serial port so that we can use it for debugging
+  Serial.begin(115200);
+  Serial.println("Radiono starting!");
 
-/* 
-IMPORTANT, the wire.h is modified so that the internal pull up resisters are not enabled. 
-This is required to interface Arduino with the 3.3v Si570's I2C interface.
-routines to interface with si570 via i2c (clock on analog pin 5, data on analog pin 4) */
-
-void i2c_write (char slave_address,char reg_address, char data )  {
-  int rdata = data;
-  Wire.beginTransmission(slave_address);
-  Wire.write(reg_address);
-  Wire.write(rdata);
-  Wire.endTransmission();
-}
-
-char i2c_read ( char slave_address, int reg_address ) {
-  unsigned char rdata = 0xFF;
-  Wire.beginTransmission(slave_address);
-  Wire.write(reg_address);
-  Wire.endTransmission();
-  Wire.requestFrom(slave_address,1);
-  if (Wire.available()) rdata = Wire.read();
-  return rdata;
-}
-
-void read_si570(){
-  //we have to read eight consecutive registers starting at register 5
-  for (int i = 7; i <= 12; i++) 
-    dco_reg[i] = i2c_read( si570_i2c_address, i);
-}
-
-void write_si570()
-{
-  int idco, i;
-  
-  // Freeze DCO
-  idco = i2c_read( si570_i2c_address,137);
-  i2c_write(si570_i2c_address, 137, idco | 0x10 );
-  	
-  i2c_write(si570_i2c_address, 7, dco_reg[7]);
-  
-  //Set Registers
-  for( i=7; i <= 12; i++){
-    i2c_write(si570_i2c_address, i, dco_reg[i]);
-    idco = i2c_read( si570_i2c_address, i);
-  }
-
-  // Unfreeze DCO
-  idco = i2c_read( si570_i2c_address, 137 );
-  i2c_write (si570_i2c_address, 137, idco & 0xEF );
-  
-  // Set new freq
-  i2c_write(si570_i2c_address,135,0x40);        
-}
-
-void qwrite_si570()
-{   
-  int i, idco;
-  //Set Registers
-  for( i=8; i <= 12; i++){
-    i2c_write(si570_i2c_address, i, dco_reg[i]);
-    idco = i2c_read( si570_i2c_address, i);
-  }
-}
-
-void setBitvals(void){
-
-	//set the rfreq values for each bit of the rfreq (integral)
-	bitval[28] = (FREQ_XTAL) / (hs * n1);
-	bitval[29] = bitval[28] << 1;
-	bitval[30] = bitval[29] << 1;
-	bitval[31] = bitval[30] << 1;
-	bitval[32] = bitval[31] << 1;
-	bitval[33] = bitval[32] << 1;
-	bitval[34] = bitval[33] << 1;
-	bitval[35] = bitval[34] << 1;
-	bitval[36] = bitval[35] << 1;
-	bitval[37] = bitval[36] << 1;
-
-	//set the rfreq values for each bit of the rfreq (integral)
-	bitval[27] = bitval[28] >> 1;
-	bitval[26] = bitval[27] >> 1;
-	bitval[25] = bitval[26] >> 1;
-	bitval[24] = bitval[25] >> 1;
-	bitval[23] = bitval[24] >> 1;
-	bitval[22] = bitval[23] >> 1;
-	bitval[21] = bitval[22] >> 1;
-	bitval[20] = bitval[21] >> 1;
-	bitval[19] = bitval[20] >> 1;
-	bitval[18] = bitval[19] >> 1;
-	bitval[17] = bitval[18] >> 1;
-	bitval[16] = bitval[17] >> 1;
-	bitval[15] = bitval[16] >> 1;
-	bitval[14] = bitval[15] >> 1;
-	bitval[13] = bitval[14] >> 1;
-	bitval[12] = bitval[13] >> 1;
-	bitval[11] = bitval[12] >> 1;
-	bitval[10] = bitval[11] >> 1;
-	bitval[9] = bitval[10] >> 1;
-	bitval[8] = bitval[9] >> 1;
-	bitval[7] = bitval[8] >> 1;
-	bitval[6] = bitval[7] >> 1;
-	bitval[5] = bitval[6] >> 1;
-	bitval[4] = bitval[5] >> 1;
-	bitval[3] = bitval[4] >> 1;
-	bitval[2] = bitval[3] >> 1;
-	bitval[1] = bitval[2] >> 1;
-	bitval[0] = bitval[1] >> 1;
-}
-
-//select reasonable dividers for a frequency
-//in order to avoid overflow, the frequency is scaled by 10
-void setDividers (unsigned long f){
-  int i, j;
-  unsigned long f_dco;
-  
-  for (i = 2; i <= 127; i+= 2)
-    for (j = 4; j <= 11; j++){
-      //skip 8 and 10 as unused
-      if (j == 8 || j == 10)
-        continue;
-      f_dco = (f/10) * i * j;
-      if (480000000L < f_dco && f_dco < 560000000L){
-        if (hs != j || n1 != i){
-          hs = j; n1 = i;
-	  setBitvals();
-        }
-        //f_dco = fnew/10 * n1 * hs;
-        return;
-    }
-  }
-}
-
-void setRfreq (unsigned long fnew){
-  int i, bit, ireg, byte;
-  unsigned long rfreq;
-
-  //reset all the registers
-  for (i = 7; i <= 12; i++)
-    dco_reg[i] = 0;
-
-  //set up HS
-  dco_reg[7] = (hs - 4) << 5;
-  dco_reg[7] = dco_reg[7] | ((n1 - 1) >> 2);
-  dco_reg[8] = ((n1-1) & 0x3) << 6;
-
-  ireg = 8; //registers go from 8 to 12 (five of them)
-  bit = 5; //the bits keep walking down
-  byte = 0;
-  rfreq = 0;
-  for (i = 37; i >= 0; i--){
-    //skip if the bitvalue is set to zero, it means, we have hit the bottom of the bitval table
-    if (bitval[i] == 0)
-      break;
-
-    if (fnew >= bitval[i]){
-      fnew = fnew - bitval[i];
-      byte = byte | (1 << bit);
-    }
-    //else{
-    // putchar('0');
-    //}
-
-    bit--;
-    if (bit < 0){
-      bit = 7;
-      //use OR instead of = as register[7] has N1 bits already set into it
-      dco_reg[ireg] |= byte;
-      byte = 0;
-      ireg++;
-    }
-  }
-}
-
-void setDCO(unsigned long newfreq){
-  
-  //check that we are not wasting our time here
-  if (dco_freq == newfreq)
-    return;
-  
-  //if the jump is small enough, we don't have to fiddle with the dividers
-  if ((newfreq > f_center && newfreq - f_center < 50000L) ||
-    (f_center > newfreq && f_center - newfreq < 50000L)){
-    setRfreq(newfreq);
-    dco_freq = newfreq;
-    qwrite_si570();
-    wasSmall = 1;
-    return;
-  }
-  //else it is a big jump
-  setDividers(newfreq);
-  setRfreq(newfreq);
-  f_center = dco_freq = newfreq;
-  write_si570();
-  wasSmall = 0;
-}
-
-void setup() {                
   lcd.begin(16, 2);
   printBuff[0] = 0;
-  printLine1("Raduino v0.02 "); 
+  printLine1("Raduino v0.02");
 
-  Wire.begin();
+  // The library automatically reads the factory calibration settings of your Si570
+  // but it needs to know for what frequency it was calibrated for.
+  // Looks like most HAM Si570 are calibrated for 56.320 Mhz.
+  // If yours was calibrated for another frequency, you need to change that here
+  vfo = new Si570(SI570_I2C_ADDRESS, 56320000);
 
-  // Force Si570 to reset to initial freq
-  i2c_write(si570_i2c_address,135,0x01);
-  delay(20);
-  read_si570();
+  if (vfo->status == SI570_ERROR) {
+    // The Si570 is unreachable. Show an error for 3 seconds and continue.
+    printLine2("Si570 comm error");
+    delay(3000);
+  }
 
-
-  sprintf(c, "%02x %02x %02x ", dco_reg[7], dco_reg[8], dco_reg[9]);
-  printLine1(c);
- 
-  sprintf(c, "%02x %02x %02x ", dco_reg[10], dco_reg[11], dco_reg[12]);
-  printLine2(c);
+  // This will print some debugging info to the serial console.
+  vfo->debugSi570();
 
   //set the initial frequency
-  setDCO(26150000L);
+  vfo->setFrequency(26150000L);
 
   //set up the pins
   pinMode(LSB, OUTPUT);
   pinMode(TX_RX, INPUT);
   pinMode(CW_KEY, OUTPUT);
-  
+
   //set the side-tone off, put the transceiver to receive mode
   digitalWrite(CW_KEY, 0);
   digitalWrite(TX_RX, 1); //old way to enable the built-in pull-ups
@@ -367,7 +174,7 @@ void readTuningPot(){
 }
 
 void checkTuning(){
-    
+
   if (-50 < tuningPosition && tuningPosition < 50){
     //we are in the middle, so, let go of the lock
     if (locked)
@@ -379,7 +186,7 @@ void checkTuning(){
   //if the tuning is locked and we are outside the safe band, then we don't move the freq.
   if (locked)
     return;
-    
+
   //dead region between -50 and 50
   if (100 < tuningPosition){
     if (tuningPosition < 100)
@@ -395,14 +202,14 @@ void checkTuning(){
     else if (tuningPosition < 350)
       frequency += 1000;
     else if (tuningPosition < 400)
-      frequency += 3000;   
+      frequency += 3000;
     else if (tuningPosition < 450){
-      frequency += 100000;   
+      frequency += 100000;
       updateDisplay();
       delay(300);
     }
     else if (tuningPosition < 500){
-      frequency += 1000000;   
+      frequency += 1000000;
       updateDisplay();
       delay(300);
     }
@@ -422,41 +229,41 @@ void checkTuning(){
     else if (tuningPosition > -350)
       frequency -= 1000;
     else if (tuningPosition > -400)
-      frequency -= 3000;   
+      frequency -= 3000;
     else if (tuningPosition > -450){
-      frequency -= 100000;   
+      frequency -= 100000;
       updateDisplay();
       delay(300);
     }
     else if (tuningPosition > -500){
-      frequency -= 1000000;   
+      frequency -= 1000000;
       updateDisplay();
       delay(300);
     }
   }
-  delay(50);  
+  delay(50);
   refreshDisplay++;
 }
 
 
 void checkTX(){
-	
+
   //we don't check for ptt when transmitting cw
   if (cwTimeout > 0)
     return;
-    
+
   if (digitalRead(TX_RX) == 0 && inTx == 0){
     refreshDisplay++;
     inTx = 1;
   }
-	
+
   if (digitalRead(TX_RX) == 1 && inTx == 1){
     refreshDisplay++;
     inTx = 0;
   }
 }
 
- 
+
 /*CW is generated by keying the bias of a side-tone oscillator.
 nonzero cwTimeout denotes that we are in cw transmit mode.
 */
@@ -482,14 +289,14 @@ void checkCW(){
   if (keyDown == 1){
      cwTimeout = CW_TIMEOUT + millis();
   }
-  
+
   //if we have a keyup
   if (keyDown == 1 && analogRead(ANALOG_KEYER) > 150){
     keyDown = 0;
     digitalWrite(CW_KEY, 0);
     cwTimeout = millis() + CW_TIMEOUT;
   }
-  
+
   //if we have keyuup for a longish time while in cw tx mode
   if (inTx == 1 && cwTimeout < millis()){
     //move the radio back to receive
@@ -526,19 +333,19 @@ void checkButton(){
     delay(200);
     return;
   }
-  
+
   t1 = t2 = i = 0;
 
   while (t1 < 30 && btnDown() == 1){
     delay(50);
     t1++;
   }
-   
+
   while (t2 < 10 && btnDown() == 0){
     delay(50);
     t2++;
   }
-  
+
   //if the press is momentary and there is no secondary press
   if (t1 < 10 && t2 > 6){
     if (ritOn)
@@ -562,24 +369,19 @@ void checkButton(){
     }
      refreshDisplay++;
      printLine2("VFO swap! ");
-  } 
+  }
   else if (t1 > 10){
     printLine2("VFOs reset!");
     vfoA= vfoB = frequency;
     refreshDisplay++;
   }
 
-//  sprintf(c, "t1=%d, t2=%d ", t1, t2);
-//  printLine2(c);
-  
   while (btnDown() == 1){
      delay(50);
   }
 }
 
 void loop(){
-  int t = 0;
-
   readTuningPot();
   checkTuning();
 
@@ -588,14 +390,14 @@ void loop(){
   checkTX();
   checkButton();
 
-  setDCO(frequency+ IF_FREQ);
-  setSideband();  
+  vfo->setFrequency(frequency + IF_FREQ);
+
+  setSideband();
   setBandswitch();
-  
+
   if (refreshDisplay){
     updateDisplay();
     refreshDisplay = 0;
-//    delay(10);
-  }  
+  }
 }
 
