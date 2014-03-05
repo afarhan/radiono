@@ -117,7 +117,7 @@ void setup() {
 
   lcd.begin(16, 2);
   printBuff[0] = 0;
-  printLine1("Raduino v0.02");
+  printLine1("Raduino v0.03");
 
   // The library automatically reads the factory calibration settings of your Si570
   // but it needs to know for what frequency it was calibrated for.
@@ -145,6 +145,7 @@ void setup() {
   //set the side-tone off, put the transceiver to receive mode
   digitalWrite(CW_KEY, 0);
   digitalWrite(TX_RX, 1); //old way to enable the built-in pull-ups
+  digitalWrite(FBUTTON, 1);
 }
 
 void setSideband(){
