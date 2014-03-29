@@ -11,15 +11,7 @@
 #include <Wire.h>
 
 #include "Si570.h"
-
-static void debug(char const *fmt, ... ) {
-  char tmp[128]; // resulting string limited to 128 chars
-  va_list args;
-  va_start (args, fmt );
-  vsnprintf(tmp, sizeof(tmp), fmt, args);
-  va_end (args);
-  Serial.println(tmp);
-}
+#include "util.h"
 
 Si570::Si570(uint8_t si570_address, uint32_t calibration_frequency) {
   i2c_address = si570_address;
@@ -52,6 +44,21 @@ Si570::Si570(uint8_t si570_address, uint32_t calibration_frequency) {
   }
 }
 
+/*
+ * This constructor is used for tests. It allows us to manually set the
+ * registers and then test the other functions.
+ */
+Si570::Si570(uint8_t registers[], uint32_t calibration_frequency) {
+  for (int i = 0; i <= 6; i++) {
+    dco_reg[7 + i] = registers[i];
+  }
+  freq_xtal = (uint64_t)calibration_frequency * getHsDiv() * getN1() / getRfReqDouble();
+
+  f_center = 0;
+  frequency = 0;
+  status = SI570_READY;
+}
+
 void Si570::debugSi570() {
   debug(" --- Si570 Debug Info ---");
   debug("Crystal frequency calibrated at: %lu", freq_xtal);
@@ -81,17 +88,22 @@ uint8_t Si570::getN1() {
 uint64_t Si570::getRfReq() {
   uint64_t dcoFrequency = 0;
 
-  dcoFrequency =  (uint64_t)(this->dco_reg[8] & 0x3F) << 32;
-  dcoFrequency |= (uint64_t)this->dco_reg[9]  << 24;
-  dcoFrequency |= (uint64_t)this->dco_reg[10] << 16;
-  dcoFrequency |= this->dco_reg[11] << 8;
-  dcoFrequency |= this->dco_reg[12];
+  dcoFrequency = 0;
+  dcoFrequency = (uint64_t)(dco_reg[8] & 0x3F);
+  dcoFrequency = (dcoFrequency << 8) | (uint64_t) dco_reg[9];
+  dcoFrequency = (dcoFrequency << 8) | (uint64_t) dco_reg[10];
+  dcoFrequency = (dcoFrequency << 8) | (uint64_t) dco_reg[11];
+  dcoFrequency = (dcoFrequency << 8) | (uint64_t) dco_reg[12];
 
   return dcoFrequency;
 }
 
 double Si570::getRfReqDouble() {
   return ((double) getRfReq() / ((uint64_t)1 << 28));
+}
+
+unsigned long Si570::getFreqXtal() {
+  return freq_xtal;
 }
 
 void Si570::i2c_write(uint8_t reg_address, uint8_t data) {

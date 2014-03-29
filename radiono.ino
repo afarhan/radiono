@@ -6,6 +6,9 @@
  * Copyright 2013 - Ashar Farhan
  */
 
+#define __ASSERT_USE_STDERR
+#include <assert.h>
+
 /*
  * Wire is only used from the Si570 module but we need to list it here so that
  * the Arduino environment knows we need it.
@@ -14,8 +17,10 @@
 #include <LiquidCrystal.h>
 
 #include <avr/io.h>
-#include <stdlib.h>
 #include "Si570.h"
+#include "debug.h"
+
+#define RADIONO_VERSION "0.4"
 
 /*
  The 16x2 LCD is connected as follows:
@@ -31,6 +36,11 @@
 #define SI570_I2C_ADDRESS 0x55
 #define IF_FREQ   (19997000l) //this is for usb, we should probably have the USB and LSB frequencies separately
 #define CW_TIMEOUT (600l) // in milliseconds, this is the parameter that determines how long the tx will hold between cw key downs
+
+// When RUN_TESTS is 1, the Radiono will automatically do some software testing when it starts.
+// Please note, that those are not hardware tests! - Comment this line to save some space.
+#define RUN_TESTS 1
+
 
 unsigned long frequency = 14200000;
 unsigned long vfoA=14200000L, vfoB=14200000L, ritA, ritB;
@@ -113,11 +123,16 @@ void updateDisplay(){
 void setup() {
   // Initialize the Serial port so that we can use it for debugging
   Serial.begin(115200);
-  Serial.println("Radiono starting!");
-
+  debug("Radiono starting - Version: %s", RADIONO_VERSION);
   lcd.begin(16, 2);
+
+#ifdef RUN_TESTS
+  run_tests();
+#endif
+
   printBuff[0] = 0;
-  printLine1("Raduino v0.03");
+  printLine1("Raduino ");
+  lcd.print(RADIONO_VERSION);
 
   // The library automatically reads the factory calibration settings of your Si570
   // but it needs to know for what frequency it was calibrated for.
@@ -401,4 +416,47 @@ void loop(){
     refreshDisplay = 0;
   }
 }
+
+#ifdef RUN_TESTS
+
+bool run_tests() {
+  /* Those tests check that the Si570 libary is able to understand the
+   * register values provided and do the required math with them.
+   */
+  // Testing for thomas - si570
+  {
+    uint8_t registers[] = { 0xe1, 0xc2, 0xb5, 0x7c, 0x77, 0x70 };
+    vfo = new Si570(registers, 56320000);
+    assert(vfo->getFreqXtal() == 114347712);
+    delete(vfo);
+  }
+
+  // Testing Jerry - si570
+  {
+    uint8_t registers[] = { 0xe1, 0xc2, 0xb6, 0x36, 0xbf, 0x42 };
+    vfo = new Si570(registers, 56320000);
+    assert(vfo->getFreqXtal() == 114227856);
+    delete(vfo);
+  }
+
+  Serial.println("Tests successful!");
+  return true;
+}
+
+// handle diagnostic informations given by assertion and abort program execution:
+void __assert(const char *__func, const char *__file, int __lineno, const char *__sexp) {
+  debug("ASSERT FAILED - %s (%s:%i): %s", __func, __file, __lineno, __sexp);
+  Serial.flush();
+  // Show something on the screen
+  lcd.setCursor(0, 0);
+  lcd.print("OOPS ");
+  lcd.print(__file);
+  lcd.setCursor(0, 1);
+  lcd.print("Line: ");
+  lcd.print(__lineno);
+  // abort program execution.
+  abort();
+}
+
+#endif
 

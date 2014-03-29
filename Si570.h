@@ -8,8 +8,13 @@ typedef enum {
 class Si570
 {
 public:
+  /* Will initialize from the give i2c_address */
   Si570(uint8_t i2c_address, uint32_t calibration_frequency);
+  /* Manually initialize with those register values -- For testing only. */
+  Si570(uint8_t registers[], uint32_t calibration_frequency);
+
   Si570_Status setFrequency(unsigned long newfreq);
+  unsigned long getFreqXtal();
   void debugSi570();
 
   Si570_Status status;
