@@ -132,7 +132,7 @@ int Si570::i2c_read(uint8_t reg_address, uint8_t *output, uint8_t length) {
 
   int error = Wire.endTransmission();
   if (error != 0) {
-    debug("Error reading %i bytes from register %i. endTransmission() returned %i", reg_address, error);
+    debug("Error reading %i bytes from register %i. endTransmission() returned %i", length, reg_address, error);
     return 0;
   }
 
