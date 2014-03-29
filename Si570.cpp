@@ -56,7 +56,7 @@ void Si570::debugSi570() {
   debug(" --- Si570 Debug Info ---");
   debug("Crystal frequency calibrated at: %lu", freq_xtal);
   debug("Status: %i", status);
-  for (int i = 7; i < 15; i++) {
+  for (int i = 7; i < 13; i++) {
     debug("Register[%i] = %02x", i, dco_reg[i]);
   }
   debug("HsDivider = %i  N1 = %i", getHsDiv(), getN1());
@@ -149,7 +149,7 @@ int Si570::i2c_read(uint8_t reg_address, uint8_t *output, uint8_t length) {
 bool Si570::read_si570(){
   // Try 3 times to read the registers
   for (int i = 0; i < 3; i++) {
-    //we have to read eight consecutive registers starting at register 7
+    //we have to read six consecutive registers starting at register 7
     if (i2c_read(7, &(dco_reg[7]), 6) == 6) {
       return true;
     }
