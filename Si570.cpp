@@ -88,7 +88,6 @@ uint8_t Si570::getN1() {
 uint64_t Si570::getRfReq() {
   uint64_t dcoFrequency = 0;
 
-  dcoFrequency = 0;
   dcoFrequency = (uint64_t)(dco_reg[8] & 0x3F);
   dcoFrequency = (dcoFrequency << 8) | (uint64_t) dco_reg[9];
   dcoFrequency = (dcoFrequency << 8) | (uint64_t) dco_reg[10];
