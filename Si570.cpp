@@ -11,7 +11,7 @@
 #include <Wire.h>
 
 #include "Si570.h"
-#include "util.h"
+#include "debug.h"
 
 Si570::Si570(uint8_t si570_address, uint32_t calibration_frequency) {
   i2c_address = si570_address;

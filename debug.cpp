@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include "util.h"
+#include "debug.h"
 
 void debug(char const *fmt, ... ) {
   char tmp[128]; // resulting string limited to 128 chars
