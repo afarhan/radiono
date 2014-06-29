@@ -1,7 +1,7 @@
 /*
  * Si570 Library for Arduino
  *
- * MIT License
+ * GNU GPLv3 License
  *
  * Copyright Thomas Sarlandie - 2014
  * Based on previous work by Ashar Farhan
