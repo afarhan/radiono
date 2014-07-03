@@ -131,7 +131,7 @@ unsigned char locked = 0; //the tuning can be locked: wait until it goes into de
 #define ANALOG_TUNING (A2)
 #define ANALOG_KEYER (A1)
 
-static unsigned long bands[] {  // Lower and Upper Band Limits
+const unsigned long bands[] = {  // Lower and Upper Band Limits
       1800000LU,  2000000LU, // 160m
       3500000LU,  4000000LU, //  80m
       7000000LU,  7300000LU, //  40m
@@ -293,7 +293,7 @@ void setup() {
   //char *pch = strrchr(__FILE__,'/')+1;
   //lcd.print(pch);
   //delay(2000);
-  printLine2("Multi-FN Btns BA");
+  printLine2("Multi-FN Btns BB");
   delay(2000);
   
 
@@ -615,7 +615,7 @@ void checkButton(){
 
 // ###############################################################################
 void decodeBandUpDown(int dir) {
-  static unsigned long freqCache[] { // Set Default Values for Cache
+  static unsigned long freqCache[] = { // Set Default Values for Cache
       1900000LU, // 160m
       3600000LU, //  80m
       7125000LU, //  40m
@@ -633,40 +633,40 @@ void decodeBandUpDown(int dir) {
    
    switch (dir) {  // Decode Direction of Band Change
      
-   case +1:  // For Band Change, Up
-     for (i = 0; i < BANDS; i++) {
-       if (frequency <= bands[i*2+1]) {
-         if (frequency >= bands[i*2]) {
-           // Save Current Ham frequency and sideBandMode
-           freqCache[i] = frequency;
-           sideBandModeCache[i] = sideBandMode;
-           i++;
-         }
-         // Load From Next Cache
-         frequency = freqCache[min(i,BANDS-1)];
-         sideBandMode = sideBandModeCache[min(i,BANDS-1)];
-         freqPrevious = frequency;
-         break;
-       }
-     }
-     break;
-     
-   case -1:  // For Band Change, Down
-     for (i = BANDS-1; i > 0; i--) {
-       if (frequency >= bands[i*2]) {
+     case +1:  // For Band Change, Up
+       for (i = 0; i < BANDS; i++) {
          if (frequency <= bands[i*2+1]) {
-           // Save Current Ham frequency and sideBandMode
-           freqCache[i] = frequency;
-           sideBandModeCache[i] = sideBandMode;
-           i--;
+           if (frequency >= bands[i*2]) {
+             // Save Current Ham frequency and sideBandMode
+             freqCache[i] = frequency;
+             sideBandModeCache[i] = sideBandMode;
+             i++;
+           }
+           // Load From Next Cache
+           frequency = freqCache[min(i,BANDS-1)];
+           sideBandMode = sideBandModeCache[min(i,BANDS-1)];
+           freqPrevious = frequency;
+           break;
          }
-         frequency = freqCache[max(i,0)];
-         sideBandMode = sideBandModeCache[max(i,0)];
-         freqPrevious = frequency;
-         break;
        }
-     }
-     break;
+       break;
+     
+     case -1:  // For Band Change, Down
+       for (i = BANDS-1; i > 0; i--) {
+         if (frequency >= bands[i*2]) {
+           if (frequency <= bands[i*2+1]) {
+             // Save Current Ham frequency and sideBandMode
+             freqCache[i] = frequency;
+             sideBandModeCache[i] = sideBandMode;
+             i--;
+           }
+           frequency = freqCache[max(i,0)];
+           sideBandMode = sideBandModeCache[max(i,0)];
+           freqPrevious = frequency;
+           break;
+         }
+       }
+       break;
      
    }
    
