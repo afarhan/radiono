@@ -345,7 +345,7 @@ void setSideband(){
   
   switch(sideBandMode) {
     case AUTO_SIDEBAND_MODE: // Automatic Side Band Mode
-      isLSB = (frequency < 10000000L); break;
+      isLSB = (frequency < 10000000L) ? 1 : 0 ; break;
     case UPPER_SIDEBAND_MODE: // Force USB Mode
       isLSB = 0; break;
     case LOWER_SIDEBAND_MODE: // Force LSB Mode
