@@ -199,18 +199,18 @@ void updateDisplay(){
       sprintf(b, "%08ld", frequency);
       
       // Top Line of LCD
-      sprintf(c, "%s:%.2s.%.6s %s",
+      sprintf(c, "%s:%.2s.%.6s %-6s",
           vfoActive == VFO_A ? "A" : "B" ,
           b,  b+2,
-          ritOn ? "RIT" : "    ");
+          ritOn ? "RIT" : " ");
       printLine1(c);
       
       // Bottom Line of LCD
-      sprintf(c, "%s%s %s %s     ",
+      sprintf(c, "%s%s %s %-6s",
           isLSB ? "LSB" : "USB",
           sideBandMode > 0 ? "*" : " ",
           inTx ? "TX" : "RX",
-          freqUnStable ? "     " : vfoStatus[vfo->status]);
+          freqUnStable ? " " : vfoStatus[vfo->status]);
       printLine2(c);
       
       setCursorCRM(11 - (cursorDigitPosition + (cursorDigitPosition>6) ), 0, CURSOR_MODE);
@@ -768,7 +768,7 @@ void setup() {
   //char *pch = strrchr(__FILE__,'/')+1;
   //lcd.print(pch);
   //delay(2000);
-  printLine2("Multi-FN Btns BF");
+  printLine2("Multi-FN Btns BG");
   delay(2000);
   
 
@@ -783,7 +783,9 @@ void setup() {
     printLine2("Si570 comm error");
     delay(3000);
   }
-  printLine2("                ");  // Added: ERB
+  
+  sprintf(c, "%-16s", " ");
+  printLine2(c);
   
 
   // This will print some debugging info to the serial console.

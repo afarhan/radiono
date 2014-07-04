@@ -12,9 +12,11 @@
 #include <Wire.h>
 
 #include "Si570.h"
+#include "debug.h"
 
 //#define IF_FREQ   (19997000L)
 
+/*
 // Debug output
 static void debug(char const *fmt, ... ) 
 {
@@ -47,6 +49,7 @@ static void dump(const void *mem, int n)
   }
   debug("");
 }
+*/
 
 // Initialize the Si570 and determine its internal crystal frequency given the default output frequency
 Si570::Si570(uint8_t si570_address, uint32_t calibration_frequency) 
