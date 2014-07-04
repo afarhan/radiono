@@ -5,7 +5,7 @@
 #include "debug.h"
 
 void debug(char const *fmt, ... ) {
-  char tmp[128]; // resulting string limited to 128 chars
+  char tmp[64]; // resulting string limited to 64 chars
   va_list args;
   va_start (args, fmt );
   vsnprintf(tmp, sizeof(tmp), fmt, args);

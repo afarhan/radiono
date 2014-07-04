@@ -76,7 +76,7 @@ unsigned long cwTimeout = 0;
 Si570 *vfo;
 LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
 
-char b[20], c[20], printBuff[32];
+char b[20], c[20];
 
 /* tuning pot stuff */
 unsigned char refreshDisplay = 0;
@@ -162,13 +162,15 @@ unsigned ritOn = 0;
 /* dds ddschip(DDS9850, 5, 6, 7, 125000000LL); */
 
 // ###############################################################################
+// ###############################################################################
+// ###############################################################################
+// ###############################################################################
+
+// ###############################################################################
 /* display routines */
 void printLine1(char const *c){
-  if (strcmp(c, printBuff)){
     lcd.setCursor(0, 0);
     lcd.print(c);
-    strcpy(printBuff, c);
-  }
 }
 
 void printLine2(char const *c){
@@ -281,7 +283,7 @@ void setSideband(){
   
   switch(sideBandMode) {
     case AUTO_SIDEBAND_MODE: // Automatic Side Band Mode
-      isLSB = (frequency < 10000000L) ? 1 : 0 ; break;
+      isLSB = (frequency < 10000000UL) ? 1 : 0 ; break;
     case UPPER_SIDEBAND_MODE: // Force USB Mode
       isLSB = 0; break;
     case LOWER_SIDEBAND_MODE: // Force LSB Mode
@@ -311,7 +313,7 @@ void setPaBandSignal(){
   if (band == prevBand) return;
   prevBand = band;
   
-  debug("Band Change, Index = %d", band);
+  debug("Band,Index = %d", band);
 
   digitalWrite(PA_BAND_CLK, 1);  // Output Reset Pulse for PA Band Filter
   delay(500);
@@ -506,7 +508,7 @@ int btnDown(){
   // Val should be approximately = (btnN×4700)÷(47000+4700)×1023
   //sprintf(c,"Val= %d            ", val); printLine2(c); delay(1000);  // For Debug Only
   
-  debug("btn Value %d", val);
+  debug("btn Val= %d", val);
   
   if (val > 350) return 7;
   if (val > 300) return 6;
@@ -540,7 +542,7 @@ void checkButton() {
     case 2: decodeMoveCursor(btn); break;    
     case 3: decodeMoveCursor(btn); break;
     case 4: decodeSideBandMode(btn); break;
-    case 5: decodeBandUpDown(1); break; // Band Up
+    case 5: decodeBandUpDown(+1); break; // Band Up
     case 6: decodeBandUpDown(-1); break; // Band Down
     case 7: decodeAux(btn); break; // Report Un Used AUX Buttons
     default: return;
@@ -621,7 +623,7 @@ void decodeSideBandMode(int btn) {
   sideBandMode %= 3; // Limit to Three Modes
   setSideband();
   cursorOff();
-  sprintf(c,"%s               ", sideBandText[sideBandMode]);
+  sprintf(c,"%-16s", sideBandText[sideBandMode]);
   printLine2(c);
   deDounceBtnRelease(); // Wait for Release
   refreshDisplay++;
@@ -648,7 +650,7 @@ void decodeMoveCursor(int btn) {
 void decodeAux(int btn) {
   //debug("Aux %d", btn);
   cursorOff();
-  sprintf(c,"Btn: %d         ", btn);
+  sprintf(c,"Btn: %d%16s", btn, ' ');
   printLine2(c);
   deDounceBtnRelease(); // Wait for Button Release
   refreshDisplay++;
@@ -718,7 +720,8 @@ void decodeFN(int btn) {
       refreshDisplay++;
       updateDisplay();
       cursorOff();
-      printLine2("VFO swap!   ");
+      sprintf(c, "%-16s", "VFO swap!");
+      printLine2(c);
       break;
       
     case LONG_PRESS:
@@ -727,7 +730,8 @@ void decodeFN(int btn) {
       refreshDisplay++;
       updateDisplay();
       cursorOff();
-      printLine2("VFOs reset! ");
+      sprintf(c, "%-16s", "VFO reset!");
+      printLine2(c);
       break;
     default:
       return;
@@ -756,7 +760,6 @@ void setup() {
   run_tests();
 #endif
 
-  printBuff[0] = 0;
   printLine1("Raduino ");
   lcd.print(RADIONO_VERSION);
   
@@ -765,7 +768,7 @@ void setup() {
   //char *pch = strrchr(__FILE__,'/')+1;
   //lcd.print(pch);
   //delay(2000);
-  printLine2("Multi-FN Btns BC");
+  printLine2("Multi-FN Btns BF");
   delay(2000);
   
 
