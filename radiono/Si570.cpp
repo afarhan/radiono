@@ -13,7 +13,7 @@
 
 #include "Si570.h"
 
-#define IF_FREQ   (19997000L)
+//#define IF_FREQ   (19997000L)
 
 // Debug output
 static void debug(char const *fmt, ... ) 

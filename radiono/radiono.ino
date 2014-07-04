@@ -37,9 +37,13 @@
 #include <Wire.h>
 #include <LiquidCrystal.h>
 
+
+#include <avr/pgmspace.h>
 #include <avr/io.h>
 #include "Si570.h"
 #include "debug.h"
+
+
 
 
 //#define RADIONO_VERSION "0.4"
@@ -58,15 +62,15 @@
 
 #define SI570_I2C_ADDRESS 0x55
 //#define IF_FREQ   (0)  // FOR DEBUG ONLY
-#define IF_FREQ   (19997000l) //this is for usb, we should probably have the USB and LSB frequencies separately
-#define CW_TIMEOUT (600l) // in milliseconds, this is the parameter that determines how long the tx will hold between cw key downs
+#define IF_FREQ   (19997000L) //this is for usb, we should probably have the USB and LSB frequencies separately
+#define CW_TIMEOUT (600L) // in milliseconds, this is the parameter that determines how long the tx will hold between cw key downs
 
 // When RUN_TESTS is 1, the Radiono will automatically do some software testing when it starts.
 // Please note, that those are not hardware tests! - Comment this line to save some space.
 //#define RUN_TESTS 1
 
-unsigned long frequency = 14200000;
-unsigned long vfoA=14200000L, vfoB=14200000L, ritA, ritB;
+unsigned long frequency = 14200000UL;
+unsigned long vfoA=14200000UL, vfoB=14200000UL, ritA, ritB;
 unsigned long cwTimeout = 0;
 
 Si570 *vfo;
@@ -76,16 +80,14 @@ char b[20], c[20], printBuff[32];
 
 /* tuning pot stuff */
 unsigned char refreshDisplay = 0;
-unsigned int stepSize = 100;
 
 // Added by ERB
-#define MAX_FREQ (30000000LU)
+#define MAX_FREQ (30000000UL)
 
 #define DEAD_ZONE (40)
 
 #define CURSOR_MODE (1)
 #define DIGIT_MODE (2)
-#define MODE_SWITCH_TIME (2000U)
 
 #define NO_CURSOR (0)
 #define UNDERLINE (1)
@@ -103,13 +105,11 @@ unsigned int stepSize = 100;
 int tuningDir = 0;
 int tuningPosition = 0;
 int freqUnStable = 1;
-int tuneMode = CURSOR_MODE;
 int tuningPositionDelta = 0;
 int cursorDigitPosition=0;
 int tuningPositionPrevious = 0;
 int cursorCol, cursorRow, cursorMode;
 int winkOn;
-unsigned long modeSwitchTime;
 unsigned long freqPrevious;
 char* sideBandText[] = {"Auto SB","USB","LSB"};
 int sideBandMode = 0;
@@ -131,19 +131,21 @@ unsigned char locked = 0; //the tuning can be locked: wait until it goes into de
 #define ANALOG_TUNING (A2)
 #define ANALOG_KEYER (A1)
 
-const unsigned long bands[] = {  // Lower and Upper Band Limits
-      1800000LU,  2000000LU, // 160m
-      3500000LU,  4000000LU, //  80m
-      7000000LU,  7300000LU, //  40m
-     10100000LU, 10150000LU, //  30m
-     14000000LU, 14350000LU, //  20m
-     18068000LU, 18168000LU, //  17m
-     21000000LU, 21450000LU, //  15m
-     24890000LU, 24990000LU, //  12m
-     28000000LU, 29700000LU, //  10m
+// PROGMEM is used to avoid using the small available variable space
+prog_uint32_t bands[] PROGMEM = {  // Lower and Upper Band Limits
+      1800000UL,  2000000UL, // 160m
+      3500000UL,  4000000UL, //  80m
+      7000000UL,  7300000UL, //  40m
+     10100000UL, 10150000UL, //  30m
+     14000000UL, 14350000UL, //  20m
+     18068000UL, 18168000UL, //  17m
+     21000000UL, 21450000UL, //  15m
+     24890000UL, 24990000UL, //  12m
+     28000000UL, 29700000UL, //  10m
    };
 
-#define BANDS (sizeof(bands)/sizeof(unsigned long)/2)
+#define BANDS (sizeof(bands)/sizeof(prog_uint32_t)/2)
+
 
 #define VFO_A 0
 #define VFO_B 1
@@ -273,75 +275,9 @@ void updateCursor() {
  
 }
 
-// ###############################################################################
-void setup() {
-  // Initialize the Serial port so that we can use it for debugging
-  Serial.begin(115200);
-  debug("Radiono starting - Version: %s", RADIONO_VERSION);
-  lcd.begin(16, 2);
-
-#ifdef RUN_TESTS
-  run_tests();
-#endif
-
-  printBuff[0] = 0;
-  printLine1("Raduino ");
-  lcd.print(RADIONO_VERSION);
-  
-  // Print just the File Name, Added by ERB
-  //printLine2("F: ");
-  //char *pch = strrchr(__FILE__,'/')+1;
-  //lcd.print(pch);
-  //delay(2000);
-  printLine2("Multi-FN Btns BB");
-  delay(2000);
-  
-
-  // The library automatically reads the factory calibration settings of your Si570
-  // but it needs to know for what frequency it was calibrated for.
-  // Looks like most HAM Si570 are calibrated for 56.320 Mhz.
-  // If yours was calibrated for another frequency, you need to change that here
-  vfo = new Si570(SI570_I2C_ADDRESS, 56320000);
-
-  if (vfo->status == SI570_ERROR) {
-    // The Si570 is unreachable. Show an error for 3 seconds and continue.
-    printLine2("Si570 comm error");
-    delay(3000);
-  }
-  printLine2("                ");  // Added: ERB
-  
-
-  // This will print some debugging info to the serial console.
-  vfo->debugSi570();
-
-  //set the initial frequency
-  vfo->setFrequency(26150000L);
-
-  //set up the pins
-  pinMode(LSB, OUTPUT);
-  pinMode(TX_RX, INPUT);
-  pinMode(CW_KEY, OUTPUT);
-  pinMode(ANALOG_TUNING, INPUT);
-  pinMode(FBUTTON, INPUT);
-
-  //set the side-tone off, put the transceiver to receive mode
-  digitalWrite(CW_KEY, 0);
-  digitalWrite(TX_RX, 1); //old way to enable the built-in pull-ups
-  digitalWrite(ANALOG_TUNING, 1);
-  digitalWrite(FBUTTON, 0); // Use an external pull-up of 47K ohm to AREF
-  
-  tuningPositionPrevious = tuningPosition = analogRead(ANALOG_TUNING);
-  refreshDisplay = 1;
-}
-
 
 // ###############################################################################
 void setSideband(){
-  static int prevSideBandMode;
-  
-  //if (sideBandMode == prevSideBandMode) return;
-  
-  prevSideBandMode = sideBandMode;
   
   switch(sideBandMode) {
     case AUTO_SIDEBAND_MODE: // Automatic Side Band Mode
@@ -394,22 +330,18 @@ int freq2Band(){
   
   //debug("Freq = %lu", frequency);
   
-  if (frequency <  4000000LU) return 4; //   3.5 MHz
-  if (frequency < 10200000LU) return 3; //  7-10 MHz
-  if (frequency < 18200000LU) return 2; // 14-18 MHz
-  if (frequency < 30000000LU) return 1; // 21-28 MHz
+  if (frequency <  4000000UL) return 4; //   3.5 MHz
+  if (frequency < 10200000UL) return 3; //  7-10 MHz
+  if (frequency < 18200000UL) return 2; // 14-18 MHz
+  if (frequency < 30000000UL) return 1; // 21-28 MHz
   return 1;
 }
 
 
 // ###############################################################################
 void setBandswitch(){
-  static unsigned prevFrequency;
   
-  //if (frequency == prevFrequency) return;
-  //prevFrequency = frequency;
-  
-  if (frequency >= 15000000L) {
+  if (frequency >= 15000000UL) {
     digitalWrite(BAND_HI, 1);
   }
   else {
@@ -573,6 +505,9 @@ int btnDown(){
   // 47K Pull-up, and 4.7K switch resistors,
   // Val should be approximately = (btnN×4700)÷(47000+4700)×1023
   //sprintf(c,"Val= %d            ", val); printLine2(c); delay(1000);  // For Debug Only
+  
+  debug("btn Value %d", val);
+  
   if (val > 350) return 7;
   if (val > 300) return 6;
   if (val > 250) return 5;
@@ -583,18 +518,18 @@ int btnDown(){
 }
 
 // -------------------------------------------------------------------------------
-void deDounceBtnRelease () {
+void deDounceBtnRelease() {
   int i = 2;
   
     while (--i) { // DeBounce Button Release, Check twice
-      while (btnDown()){
+      while (btnDown()) {
        delay(20);
       }
     }
 }
 
 // ###############################################################################
-void checkButton(){
+void checkButton() {
   int btn;
   btn = btnDown();
   if (btn) debug("btn %d", btn);
@@ -627,7 +562,7 @@ void decodeBandUpDown(int dir) {
      28300000LU, //  10m
    };
    
-   static int sideBandModeCache[BANDS];
+   static byte sideBandModeCache[BANDS];
    
    int i;
    
@@ -635,8 +570,8 @@ void decodeBandUpDown(int dir) {
      
      case +1:  // For Band Change, Up
        for (i = 0; i < BANDS; i++) {
-         if (frequency <= bands[i*2+1]) {
-           if (frequency >= bands[i*2]) {
+         if (frequency <= pgm_read_dword(&bands[i*2+1])) {
+           if (frequency >= pgm_read_dword(&bands[i*2])) {
              // Save Current Ham frequency and sideBandMode
              freqCache[i] = frequency;
              sideBandModeCache[i] = sideBandMode;
@@ -653,8 +588,8 @@ void decodeBandUpDown(int dir) {
      
      case -1:  // For Band Change, Down
        for (i = BANDS-1; i > 0; i--) {
-         if (frequency >= bands[i*2]) {
-           if (frequency <= bands[i*2+1]) {
+         if (frequency >= pgm_read_dword(&bands[i*2])) {
+           if (frequency <= pgm_read_dword(&bands[i*2+1])) {
              // Save Current Ham frequency and sideBandMode
              freqCache[i] = frequency;
              sideBandModeCache[i] = sideBandMode;
@@ -802,10 +737,79 @@ void decodeFN(int btn) {
   deDounceBtnRelease(); // Wait for Button Release
 }
 
+
+// ###############################################################################
+// ###############################################################################
+// ###############################################################################
+// ###############################################################################
+
+
+// ###############################################################################
+// ###############################################################################
+void setup() {
+  // Initialize the Serial port so that we can use it for debugging
+  Serial.begin(115200);
+  debug("Radiono starting - Version: %s", RADIONO_VERSION);
+  lcd.begin(16, 2);
+
+#ifdef RUN_TESTS
+  run_tests();
+#endif
+
+  printBuff[0] = 0;
+  printLine1("Raduino ");
+  lcd.print(RADIONO_VERSION);
+  
+  // Print just the File Name, Added by ERB
+  //printLine2("F: ");
+  //char *pch = strrchr(__FILE__,'/')+1;
+  //lcd.print(pch);
+  //delay(2000);
+  printLine2("Multi-FN Btns BC");
+  delay(2000);
+  
+
+  // The library automatically reads the factory calibration settings of your Si570
+  // but it needs to know for what frequency it was calibrated for.
+  // Looks like most HAM Si570 are calibrated for 56.320 Mhz.
+  // If yours was calibrated for another frequency, you need to change that here
+  vfo = new Si570(SI570_I2C_ADDRESS, 56320000);
+
+  if (vfo->status == SI570_ERROR) {
+    // The Si570 is unreachable. Show an error for 3 seconds and continue.
+    printLine2("Si570 comm error");
+    delay(3000);
+  }
+  printLine2("                ");  // Added: ERB
+  
+
+  // This will print some debugging info to the serial console.
+  vfo->debugSi570();
+
+  //set the initial frequency
+  vfo->setFrequency(26150000L);
+
+  //set up the pins
+  pinMode(LSB, OUTPUT);
+  pinMode(TX_RX, INPUT);
+  pinMode(CW_KEY, OUTPUT);
+  pinMode(ANALOG_TUNING, INPUT);
+  pinMode(FBUTTON, INPUT);
+
+  //set the side-tone off, put the transceiver to receive mode
+  digitalWrite(CW_KEY, 0);
+  digitalWrite(TX_RX, 1); //old way to enable the built-in pull-ups
+  digitalWrite(ANALOG_TUNING, 1);
+  digitalWrite(FBUTTON, 0); // Use an external pull-up of 47K ohm to AREF
+  
+  tuningPositionPrevious = tuningPosition = analogRead(ANALOG_TUNING);
+  refreshDisplay = 1;
+}
+
+
 // ###############################################################################
 // ###############################################################################
 void loop(){
-  static unsigned long previousFrequency;
   
   readTuningPot();
   checkTuning();
