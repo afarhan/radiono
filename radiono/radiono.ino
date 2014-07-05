@@ -102,17 +102,17 @@ unsigned char refreshDisplay = 0;
 #define UPPER_SIDEBAND_MODE (1)
 #define LOWER_SIDEBAND_MODE (2)
 
-byte tuningDir = 0;
+int tuningDir = 0;
 int tuningPosition = 0;
 int freqUnStable = 1;
 int tuningPositionDelta = 0;
-byte cursorDigitPosition = 0;
+int cursorDigitPosition = 0;
 int tuningPositionPrevious = 0;
-byte cursorCol, cursorRow, cursorMode;
+int cursorCol, cursorRow, cursorMode;
 int winkOn;
 unsigned long freqPrevious;
 char* const sideBandText[] PROGMEM = {"Auto SB","USB","LSB"};
-byte sideBandMode = 0;
+int sideBandMode = 0;
 // End ERB add
 
 
@@ -771,7 +771,7 @@ void setup() {
   //char *pch = strrchr(__FILE__,'/')+1;
   //lcd.print(pch);
   //delay(2000);
-  printLine2("Multi-FN Btns BI");
+  printLine2("Multi-FN Btns CA");
   delay(2000);
   
 
