@@ -102,17 +102,17 @@ unsigned char refreshDisplay = 0;
 #define UPPER_SIDEBAND_MODE (1)
 #define LOWER_SIDEBAND_MODE (2)
 
-int tuningDir = 0;
+byte tuningDir = 0;
 int tuningPosition = 0;
 int freqUnStable = 1;
 int tuningPositionDelta = 0;
-int cursorDigitPosition=0;
+byte cursorDigitPosition = 0;
 int tuningPositionPrevious = 0;
-int cursorCol, cursorRow, cursorMode;
+byte cursorCol, cursorRow, cursorMode;
 int winkOn;
 unsigned long freqPrevious;
-char* sideBandText[] = {"Auto SB","USB","LSB"};
-int sideBandMode = 0;
+char* const sideBandText[] PROGMEM = {"Auto SB","USB","LSB"};
+byte sideBandMode = 0;
 // End ERB add
 
 
@@ -179,6 +179,7 @@ void printLine2(char const *c){
 }
 
 // ###############################################################################
+/*
 void displayFrequency(unsigned long f){
   int mhz, khz, hz;
 
@@ -188,6 +189,7 @@ void displayFrequency(unsigned long f){
   sprintf(b, "[%02d.%03d.%03d]", mhz, khz, hz);
   printLine1(b);
 }
+*/
 
 void updateDisplay(){
   char const *vfoStatus[] = { "ERR", "RDY", "BIG", "SML" };
@@ -313,7 +315,7 @@ void setPaBandSignal(){
   if (band == prevBand) return;
   prevBand = band;
   
-  debug("Band,Index = %d", band);
+  debug("BandI = %d", band);
 
   digitalWrite(PA_BAND_CLK, 1);  // Output Reset Pulse for PA Band Filter
   delay(500);
@@ -623,7 +625,7 @@ void decodeSideBandMode(int btn) {
   sideBandMode %= 3; // Limit to Three Modes
   setSideband();
   cursorOff();
-  sprintf(c,"%-16.16s", sideBandText[sideBandMode]);
+  sprintf(c,"%-16.16s", (char *)pgm_read_word(&sideBandText[sideBandMode]));
   printLine2(c);
   deDounceBtnRelease(); // Wait for Release
   refreshDisplay++;
@@ -692,6 +694,7 @@ int getButtonPushMode(int btn) {
 void decodeFN(int btn) {
   //if the btn is down while tuning pot is not centered, then lock the tuning
   //and return
+  
   if (freqUnStable) {
     if (locked)
       locked = 0;
@@ -753,7 +756,7 @@ void decodeFN(int btn) {
 void setup() {
   // Initialize the Serial port so that we can use it for debugging
   Serial.begin(115200);
-  debug("Radiono starting - Version: %s", RADIONO_VERSION);
+  debug("Radiono - Rev: %s", RADIONO_VERSION);
   lcd.begin(16, 2);
 
 #ifdef RUN_TESTS
@@ -768,7 +771,7 @@ void setup() {
   //char *pch = strrchr(__FILE__,'/')+1;
   //lcd.print(pch);
   //delay(2000);
-  printLine2("Multi-FN Btns BH");
+  printLine2("Multi-FN Btns BI");
   delay(2000);
   
 
@@ -784,7 +787,7 @@ void setup() {
     delay(3000);
   }
   
-  sprintf(c, "%-16s", " ");
+  sprintf(c, "%-16.16s", " ");
   printLine2(c);
   
 
@@ -834,6 +837,14 @@ void loop(){
   
 }
 
+// ###############################################################################
+// ###############################################################################
+// ###############################################################################
+// ###############################################################################
+
+
+// ###############################################################################
+// ###############################################################################
 #ifdef RUN_TESTS
 
 bool run_tests() {
