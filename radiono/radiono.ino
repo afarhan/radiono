@@ -179,15 +179,23 @@ void printLine2(char const *c){
 }
 
 // print from FLASH
-void printLine1(const __FlashStringHelper *c) {
-    lcd.setCursor(0, 0);
-    lcd.print(c);
-}
+//void printLine1(const __FlashStringHelper *c) {
+//    lcd.setCursor(0, 0);
+//    lcd.print(c);
+//}
 void printLine2(const __FlashStringHelper *c) {
     lcd.setCursor(0, 1);
     lcd.print(c);
 }
 
+void printLine1(const __FlashStringHelper *fmt, ... ){
+  char tmp[64];
+  va_list args;
+  va_start (args, fmt);
+  vsnprintf_P(tmp, sizeof(tmp), (const char *)fmt, args);
+  va_end(args);
+  printLine1(tmp);
+}
 
 // ###############################################################################
 /*
@@ -206,20 +214,23 @@ void updateDisplay(){
   char const *vfoStatus[] = { "ERR", "RDY", "BIG", "SML" };
    
   if (refreshDisplay) {
+     char fmt[32];
      
       refreshDisplay = false;
       cursorOff();
       sprintf(b, "%08ld", frequency);
       
       // Top Line of LCD
-      sprintf(c, "%1s:%.2s.%.6s %-4.4s",
+      strcpy_P(fmt, PSTR("%1s:%.2s.%.6s %-4.4s"));
+      sprintf(c, fmt,
           vfoActive == VFO_A ? "A" : "B" ,
           b,  b+2,
           ritOn ? "RIT" : " ");
       printLine1(c);
       
       // Bottom Line of LCD
-      sprintf(c, "%3s%1s %2s %-8.8s",
+      strcpy_P(fmt, PSTR("%3s%1s %2s %-8.8s"));
+      sprintf(c, fmt,
           isLSB ? "LSB" : "USB",
           sideBandMode > 0 ? "*" : " ",
           inTx ? "TX" : "RX",
@@ -311,6 +322,8 @@ void setPaBandSignal(){
   // This setup is compatable with the RF386 RF Power Amplifier
   // See: http://www.hfsignals.org/index.php/RF386
 
+  char fmt[20]; 
+  
   // Bitbang Clock Pulses to Change PA Band Filter
   int band;
   static int prevBand;
@@ -326,7 +339,8 @@ void setPaBandSignal(){
   if (band == prevBand) return;
   prevBand = band;
   
-  debug("BandI = %d", band);
+  strcpy_P(fmt, PSTR("BandI = %d"));
+  debug(fmt, band);
 
   digitalWrite(PA_BAND_CLK, 1);  // Output Reset Pulse for PA Band Filter
   delay(500);
@@ -509,6 +523,8 @@ void checkCW(){
 // ###############################################################################
 int btnDown(){
   int val, val2;
+  char fmt[16];
+  
   val = analogRead(FBUTTON);
   while (val != val2) { // DeBounce Button Press
     delay(10);
@@ -521,7 +537,8 @@ int btnDown(){
   // Val should be approximately = (btnN×4700)÷(47000+4700)×1023
   //sprintf(c,"Val= %d            ", val); printLine2(c); delay(1000);  // For Debug Only
   
-  debug("btn Val= %d", val);
+  strcpy_P(fmt, PSTR("btn Val= %d"));
+  debug(fmt, val);
   
   if (val > 350) return 7;
   if (val > 300) return 6;
@@ -661,9 +678,13 @@ void decodeMoveCursor(int btn) {
 }
 
 void decodeAux(int btn) {
+  
+  char fmt[20];
+  
   //debug("Aux %d", btn);
   cursorOff();
-  sprintf(c,"Btn: %.2d%9s", btn, " ");
+  strcpy_P(fmt, PSTR("Btn: %.2d%9s"));
+  sprintf(c,fmt, btn, " ");
   printLine2(c);
   deDounceBtnRelease(); // Wait for Button Release
   refreshDisplay++;
@@ -706,6 +727,8 @@ void decodeFN(int btn) {
   //if the btn is down while tuning pot is not centered, then lock the tuning
   //and return
   
+  char fmt[20];
+  
   if (freqUnStable) {
     if (locked)
       locked = 0;
@@ -734,7 +757,8 @@ void decodeFN(int btn) {
       refreshDisplay++;
       updateDisplay();
       cursorOff();
-      sprintf(c, "%-16.16s", "VFO swap!");
+      strcpy_P(fmt, PSTR("%-16.16s"));
+      sprintf(c, fmt, "VFO swap!");
       printLine2(c);
       break;
       
@@ -744,7 +768,8 @@ void decodeFN(int btn) {
       refreshDisplay++;
       updateDisplay();
       cursorOff();
-      sprintf(c, "%-16.16s", "VFO reset!");
+      strcpy_P(fmt, PSTR("%-16.16s"));
+      sprintf(c, fmt, "VFO reset!");
       printLine2(c);
       break;
     default:
@@ -765,10 +790,16 @@ void decodeFN(int btn) {
 // ###############################################################################
 // ###############################################################################
 void setup() {
+  
+  char fmt[40];
+  
   // Initialize the Serial port so that we can use it for debugging
   Serial.begin(115200);
-  debug("Radiono - Rev: %s", RADIONO_VERSION);
   lcd.begin(16, 2);
+  
+  strcpy_P(fmt, PSTR("Radiono - Rev: %s"));
+  debug(fmt, RADIONO_VERSION);
+  
 
 #ifdef RUN_TESTS
   run_tests();
@@ -782,7 +813,7 @@ void setup() {
   //char *pch = strrchr(__FILE__,'/')+1;
   //lcd.print(pch);
   //delay(2000);
-  printLine2(F("Rev: CA 01 Exp"));
+  printLine2(F("Rev: CA 04 Exp"));
   delay(2000);
   
 
@@ -798,7 +829,9 @@ void setup() {
     delay(3000);
   }
   
-  sprintf(c, "%-16.16s", " ");
+  
+  strcpy_P(fmt, PSTR("%-16.16s"));
+  sprintf(c, fmt, " ");
   printLine2(c);
   
 

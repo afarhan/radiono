@@ -13,10 +13,16 @@ void debug(char const *fmt, ... ) {
   Serial.println(tmp);
 }
 
-
-
 void debug(const __FlashStringHelper *c) {
     Serial.println(c);
 }
 
-
+void debug(const __FlashStringHelper *fmt, ... ){
+  char tmp[64]; // resulting string limited to 128 chars
+  va_list args;
+  va_start (args, fmt);
+  vsnprintf_P(tmp, sizeof(tmp), (const char *)fmt, args);
+  va_end(args);
+  Serial.print(tmp);
+}
+// End

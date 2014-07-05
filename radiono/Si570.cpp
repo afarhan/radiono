@@ -14,6 +14,7 @@
 #include "Si570.h"
 #include "debug.h"
 
+
 //#define IF_FREQ   (19997000L)
 
 /*
@@ -54,8 +55,11 @@ static void dump(const void *mem, int n)
 // Initialize the Si570 and determine its internal crystal frequency given the default output frequency
 Si570::Si570(uint8_t si570_address, uint32_t calibration_frequency) 
 {
+  char fmt[60];
+  
   i2c_address = si570_address;
-  debug("Si570 init, calibration frequency = %lu", calibration_frequency);
+  strcpy_P(fmt, PSTR("Si570 init, calibration frequency = %lu"));
+  debug(fmt, calibration_frequency);
   Wire.begin();
 
   // Disable internal pullups - You will need external 3.3v pullups.
@@ -80,22 +84,33 @@ Si570::Si570(uint8_t si570_address, uint32_t calibration_frequency)
   {
     // Use the factory default if we were unable to talk to the chip
     freq_xtal = 114285000L;
-    debug("Unable to properly initialize Si570");
+    debug(F("Unable to properly initialize Si570"));
     status = SI570_ERROR;
   }
-  debug("freq_xtal = %04lu", freq_xtal);
+  strcpy_P(fmt, PSTR("freq_xtal = %04lu"));
+  debug(fmt, freq_xtal);
 }
 
 // Debug routine for examination of Si570 state
 void Si570::debugSi570()
 {
-  debug(" --- Si570 Debug Info ---");
-  debug("Status: %i", status);
+  char fmt[60];
+  
+  debug(F("--- Si570 Debug Info ---"));
+  
+  strcpy_P(fmt, PSTR("Status: %i"));
+  debug(fmt, status);
+  
+  strcpy_P(fmt, PSTR("Register[%i] = %02x"));
   for (int i = 7; i < 15; i++) {
-    debug("Register[%i] = %02x", i, dco_reg[i]);
+    debug(fmt, i, dco_reg[i]);
   }
-  debug("HSDIV = %i, N1 = %i", getHSDIV(), getN1());
-  debug("RFREQ (hex): %04lx%04lx", (uint32_t)(getRFREQ() >> 32), (uint32_t)(getRFREQ() & 0xffffffff));
+  
+  strcpy_P(fmt, PSTR("HSDIV = %i, N1 = %i"));
+  debug(fmt, getHSDIV(), getN1());
+  
+  strcpy_P(fmt, PSTR("RFREQ (hex): %04lx%04lx"));
+  debug(fmt, (uint32_t)(getRFREQ() >> 32), (uint32_t)(getRFREQ() & 0xffffffff));
 }
 
 // Return the 8 bit HSDIV value from register 7
@@ -139,11 +154,13 @@ int Si570::i2c_write(uint8_t reg_address, uint8_t *data, uint8_t length)
   Wire.beginTransmission(i2c_address);
   Wire.write(reg_address);
   Wire.write(data, length);
+  char fmt[60];
 
   int error = Wire.endTransmission();
   if (error != 0) 
   {
-    debug("Error writing %i bytes to register %i: %i", length, reg_address, error);
+    strcpy_P(fmt, PSTR("Error writing %i bytes to register %i: %i"));
+    debug(fmt, length, reg_address, error);
     return -1;
   }
   return length;
@@ -167,18 +184,23 @@ uint8_t Si570::i2c_read(uint8_t reg_address)
 int Si570::i2c_read(uint8_t reg_address, uint8_t *output, uint8_t length) {
   Wire.beginTransmission(i2c_address);
   Wire.write(reg_address);
+  char fmt[60];
 
   int error = Wire.endTransmission();
   if (error != 0) 
   {
-    debug("Error reading %i bytes from register %i. endTransmission() returned %i", reg_address, error);
+    strcpy_P(fmt, PSTR("Error reading %i bytes from register %i."));
+    debug(fmt, reg_address);
+    strcpy_P(fmt, PSTR(" endTransmission() returned %i"));
+    debug(fmt, error);
     return 0;
   }
 
   int len = Wire.requestFrom(i2c_address,length);
   if (len != length) 
   {
-    debug("Requested %i bytes and only got %i bytes", length, len);
+    strcpy_P(fmt, PSTR("Requested %i bytes and only got %i bytes"));
+    debug(fmt, length, len);
   }
   for (int i = 0; i < len && Wire.available(); i++)
     output[i] = Wire.read();
@@ -196,7 +218,7 @@ bool Si570::read_si570(){
     {
       return true;
     }
-    debug("Error reading Si570 registers... Retrying.");
+    debug(F("Error reading Si570 registers... Retrying."));
     delay(50);
   }
   return false;
