@@ -178,6 +178,17 @@ void printLine2(char const *c){
   lcd.print(c);
 }
 
+// print from FLASH
+void printLine1(const __FlashStringHelper *c) {
+    lcd.setCursor(0, 0);
+    lcd.print(c);
+}
+void printLine2(const __FlashStringHelper *c) {
+    lcd.setCursor(0, 1);
+    lcd.print(c);
+}
+
+
 // ###############################################################################
 /*
 void displayFrequency(unsigned long f){
@@ -763,7 +774,7 @@ void setup() {
   run_tests();
 #endif
 
-  printLine1("Raduino ");
+  printLine1(F("Raduino "));
   lcd.print(RADIONO_VERSION);
   
   // Print just the File Name, Added by ERB
@@ -771,7 +782,7 @@ void setup() {
   //char *pch = strrchr(__FILE__,'/')+1;
   //lcd.print(pch);
   //delay(2000);
-  printLine2("Multi-FN Btns CA");
+  printLine2(F("Rev: CA 01 Exp"));
   delay(2000);
   
 
@@ -783,7 +794,7 @@ void setup() {
 
   if (vfo->status == SI570_ERROR) {
     // The Si570 is unreachable. Show an error for 3 seconds and continue.
-    printLine2("Si570 comm error");
+    printLine2(F("Si570 comm error"));
     delay(3000);
   }
   

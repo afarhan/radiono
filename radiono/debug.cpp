@@ -12,3 +12,11 @@ void debug(char const *fmt, ... ) {
   va_end (args);
   Serial.println(tmp);
 }
+
+
+
+void debug(const __FlashStringHelper *c) {
+    Serial.println(c);
+}
+
+

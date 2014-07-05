@@ -66,13 +66,13 @@ Si570::Si570(uint8_t si570_address, uint32_t calibration_frequency)
   f_center = frequency = calibration_frequency;
 
   // Force Si570 to reset to initial freq
-  debug("Resetting Si570");
+  debug(F("Resetting Si570"));
   i2c_write(135,0x01);
   delay(20);
 
   if (read_si570()) 
   {
-    debug("Successfully initialized Si570");
+    debug(F("Successfully initialized Si570"));
     freq_xtal = (unsigned long) ((uint64_t) calibration_frequency * getHSDIV() * getN1() * (1L << 28) / getRFREQ());
     status = SI570_READY;
   }
