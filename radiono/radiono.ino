@@ -199,14 +199,14 @@ void updateDisplay(){
       sprintf(b, "%08ld", frequency);
       
       // Top Line of LCD
-      sprintf(c, "%s:%.2s.%.6s %-6s",
+      sprintf(c, "%1s:%.2s.%.6s %-4.4s",
           vfoActive == VFO_A ? "A" : "B" ,
           b,  b+2,
           ritOn ? "RIT" : " ");
       printLine1(c);
       
       // Bottom Line of LCD
-      sprintf(c, "%s%s %s %-6s",
+      sprintf(c, "%3s%1s %2s %-8.8s",
           isLSB ? "LSB" : "USB",
           sideBandMode > 0 ? "*" : " ",
           inTx ? "TX" : "RX",
@@ -623,7 +623,7 @@ void decodeSideBandMode(int btn) {
   sideBandMode %= 3; // Limit to Three Modes
   setSideband();
   cursorOff();
-  sprintf(c,"%-16s", sideBandText[sideBandMode]);
+  sprintf(c,"%-16.16s", sideBandText[sideBandMode]);
   printLine2(c);
   deDounceBtnRelease(); // Wait for Release
   refreshDisplay++;
@@ -650,7 +650,7 @@ void decodeMoveCursor(int btn) {
 void decodeAux(int btn) {
   //debug("Aux %d", btn);
   cursorOff();
-  sprintf(c,"Btn: %d%16s", btn, ' ');
+  sprintf(c,"Btn: %.2d%9s", btn, " ");
   printLine2(c);
   deDounceBtnRelease(); // Wait for Button Release
   refreshDisplay++;
@@ -720,7 +720,7 @@ void decodeFN(int btn) {
       refreshDisplay++;
       updateDisplay();
       cursorOff();
-      sprintf(c, "%-16s", "VFO swap!");
+      sprintf(c, "%-16.16s", "VFO swap!");
       printLine2(c);
       break;
       
@@ -730,7 +730,7 @@ void decodeFN(int btn) {
       refreshDisplay++;
       updateDisplay();
       cursorOff();
-      sprintf(c, "%-16s", "VFO reset!");
+      sprintf(c, "%-16.16s", "VFO reset!");
       printLine2(c);
       break;
     default:
@@ -768,7 +768,7 @@ void setup() {
   //char *pch = strrchr(__FILE__,'/')+1;
   //lcd.print(pch);
   //delay(2000);
-  printLine2("Multi-FN Btns BG");
+  printLine2("Multi-FN Btns BH");
   delay(2000);
   
 

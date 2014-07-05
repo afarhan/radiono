@@ -61,4 +61,6 @@ When used with my Alternate Tuning Method Sketch:
    "SBand" selects the Side Band Mode; "Auto SB", "USB", or "LSB".
    "Up" and "Down" switches Ham Band, and saves the current
 
+See: http://wa0uwh.blogspot.com/search/label/Minima
+
 --
