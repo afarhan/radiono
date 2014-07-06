@@ -781,7 +781,7 @@ void setup() {
   //char *pch = strrchr(__FILE__,'/')+1;
   //lcd.print(pch);
   //delay(2000);
-  printLine2(FLASH("Rev: CA 12 Exp"));
+  printLine2(FLASH("Rev: CB"));
   delay(2000);
   
 
