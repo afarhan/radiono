@@ -43,9 +43,6 @@
 #include "Si570.h"
 #include "debug.h"
 
-
-
-
 //#define RADIONO_VERSION "0.4"
 #define RADIONO_VERSION "0.4.erb" // Modifications by: Eldon R. Brown - WA0UWH
 
@@ -77,6 +74,7 @@ Si570 *vfo;
 LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
 
 char b[20], c[20];
+
 
 /* tuning pot stuff */
 unsigned char refreshDisplay = 0;
@@ -113,6 +111,10 @@ int winkOn;
 unsigned long freqPrevious;
 char* const sideBandText[] PROGMEM = {"Auto SB","USB","LSB"};
 int sideBandMode = 0;
+
+char fmt[60];
+#define FMT(x) strcpy_P(fmt, PSTR(x))    //ERB - Force format stings into FLASH Memory
+
 // End ERB add
 
 
@@ -178,59 +180,37 @@ void printLine2(char const *c){
   lcd.print(c);
 }
 
-// print from FLASH
-//void printLine1(const __FlashStringHelper *c) {
-//    lcd.setCursor(0, 0);
-//    lcd.print(c);
-//}
-void printLine2(const __FlashStringHelper *c) {
-    lcd.setCursor(0, 1);
-    lcd.print(c);
-}
-
-void printLine1(const __FlashStringHelper *fmt, ... ){
-  char tmp[64];
-  va_list args;
-  va_start (args, fmt);
-  vsnprintf_P(tmp, sizeof(tmp), (const char *)fmt, args);
-  va_end(args);
-  printLine1(tmp);
-}
-
 // ###############################################################################
-/*
 void displayFrequency(unsigned long f){
   int mhz, khz, hz;
 
   mhz = f / 1000000l;
   khz = (f % 1000000l)/1000;
   hz = f % 1000l;
-  sprintf(b, "[%02d.%03d.%03d]", mhz, khz, hz);
+  sprintf(b, FMT("[%02d.%03d.%03d]"), mhz, khz, hz);
   printLine1(b);
 }
-*/
+
 
 void updateDisplay(){
   char const *vfoStatus[] = { "ERR", "RDY", "BIG", "SML" };
    
   if (refreshDisplay) {
-     char fmt[32];
      
       refreshDisplay = false;
       cursorOff();
-      sprintf(b, "%08ld", frequency);
+      sprintf(b, FMT("%08ld"), frequency);
       
       // Top Line of LCD
-      strcpy_P(fmt, PSTR("%1s:%.2s.%.6s %-4.4s"));
-      sprintf(c, fmt,
+      sprintf(c, FMT("%1s:%.2s.%.6s %-4.4s"),
           vfoActive == VFO_A ? "A" : "B" ,
           b,  b+2,
           ritOn ? "RIT" : " ");
       printLine1(c);
       
       // Bottom Line of LCD
-      strcpy_P(fmt, PSTR("%3s%1s %2s %-8.8s"));
-      sprintf(c, fmt,
+      
+      sprintf(c, FMT("%3s%1s %2s %-8.8s"),
           isLSB ? "LSB" : "USB",
           sideBandMode > 0 ? "*" : " ",
           inTx ? "TX" : "RX",
@@ -322,8 +302,6 @@ void setPaBandSignal(){
   // This setup is compatable with the RF386 RF Power Amplifier
   // See: http://www.hfsignals.org/index.php/RF386
 
-  char fmt[20]; 
-  
   // Bitbang Clock Pulses to Change PA Band Filter
   int band;
   static int prevBand;
@@ -339,8 +317,8 @@ void setPaBandSignal(){
   if (band == prevBand) return;
   prevBand = band;
   
-  strcpy_P(fmt, PSTR("BandI = %d"));
-  debug(fmt, band);
+  
+  debug(FMT("BandI = %d"), band);
 
   digitalWrite(PA_BAND_CLK, 1);  // Output Reset Pulse for PA Band Filter
   delay(500);
@@ -523,7 +501,6 @@ void checkCW(){
 // ###############################################################################
 int btnDown(){
   int val, val2;
-  char fmt[16];
   
   val = analogRead(FBUTTON);
   while (val != val2) { // DeBounce Button Press
@@ -537,8 +514,7 @@ int btnDown(){
   // Val should be approximately = (btnN×4700)÷(47000+4700)×1023
   //sprintf(c,"Val= %d            ", val); printLine2(c); delay(1000);  // For Debug Only
   
-  strcpy_P(fmt, PSTR("btn Val= %d"));
-  debug(fmt, val);
+  debug(FMT("btn Val= %d"), val);
   
   if (val > 350) return 7;
   if (val > 300) return 6;
@@ -564,7 +540,7 @@ void deDounceBtnRelease() {
 void checkButton() {
   int btn;
   btn = btnDown();
-  if (btn) debug("btn %d", btn);
+  if (btn) debug(FMT("btn %d"), btn);
   
   switch (btn) {
     case 0: return; // Abort
@@ -653,7 +629,7 @@ void decodeSideBandMode(int btn) {
   sideBandMode %= 3; // Limit to Three Modes
   setSideband();
   cursorOff();
-  sprintf(c,"%-16.16s", (char *)pgm_read_word(&sideBandText[sideBandMode]));
+  sprintf(c, FMT("%-16.16s"), (char *)pgm_read_word(&sideBandText[sideBandMode]));
   printLine2(c);
   deDounceBtnRelease(); // Wait for Release
   refreshDisplay++;
@@ -679,12 +655,9 @@ void decodeMoveCursor(int btn) {
 
 void decodeAux(int btn) {
   
-  char fmt[20];
-  
   //debug("Aux %d", btn);
   cursorOff();
-  strcpy_P(fmt, PSTR("Btn: %.2d%9s"));
-  sprintf(c,fmt, btn, " ");
+  sprintf(c, FMT("Btn: %.2d%9s"), btn, " ");
   printLine2(c);
   deDounceBtnRelease(); // Wait for Button Release
   refreshDisplay++;
@@ -727,8 +700,6 @@ void decodeFN(int btn) {
   //if the btn is down while tuning pot is not centered, then lock the tuning
   //and return
   
-  char fmt[20];
-  
   if (freqUnStable) {
     if (locked)
       locked = 0;
@@ -757,8 +728,8 @@ void decodeFN(int btn) {
       refreshDisplay++;
       updateDisplay();
       cursorOff();
-      strcpy_P(fmt, PSTR("%-16.16s"));
-      sprintf(c, fmt, "VFO swap!");
+      
+      sprintf(c, FMT("%-16.16s"), "VFO swap!");
       printLine2(c);
       break;
       
@@ -768,8 +739,7 @@ void decodeFN(int btn) {
       refreshDisplay++;
       updateDisplay();
       cursorOff();
-      strcpy_P(fmt, PSTR("%-16.16s"));
-      sprintf(c, fmt, "VFO reset!");
+      sprintf(c, FMT("%-16.16s"), "VFO reset!");
       printLine2(c);
       break;
     default:
@@ -791,21 +761,18 @@ void decodeFN(int btn) {
 // ###############################################################################
 void setup() {
   
-  char fmt[40];
-  
   // Initialize the Serial port so that we can use it for debugging
   Serial.begin(115200);
   lcd.begin(16, 2);
   
-  strcpy_P(fmt, PSTR("Radiono - Rev: %s"));
-  debug(fmt, RADIONO_VERSION);
+  debug(FMT("Radiono - Rev: %s"), RADIONO_VERSION);
   
 
 #ifdef RUN_TESTS
   run_tests();
 #endif
 
-  printLine1(F("Raduino "));
+  printLine1(FMT("Raduino "));
   lcd.print(RADIONO_VERSION);
   
   // Print just the File Name, Added by ERB
@@ -813,7 +780,7 @@ void setup() {
   //char *pch = strrchr(__FILE__,'/')+1;
   //lcd.print(pch);
   //delay(2000);
-  printLine2(F("Rev: CA 04 Exp"));
+  printLine2(FMT("Rev: CA 07 Exp"));
   delay(2000);
   
 
@@ -824,14 +791,14 @@ void setup() {
   vfo = new Si570(SI570_I2C_ADDRESS, 56320000);
 
   if (vfo->status == SI570_ERROR) {
-    // The Si570 is unreachable. Show an error for 3 seconds and continue.
-    printLine2(F("Si570 comm error"));
+    // The Si570 is unreachable. Show an error for 3 seconds and continue.FMT(
+    printLine2(FMT("Si570 comm error"));
     delay(3000);
   }
   
   
-  strcpy_P(fmt, PSTR("%-16.16s"));
-  sprintf(c, fmt, " ");
+  
+  sprintf(c, FMT("%-16.16s"), " ");
   printLine2(c);
   
 
@@ -911,7 +878,7 @@ bool run_tests() {
     delete(vfo);
   }
 
-  Serial.println("Tests successful!");
+  Serial.println(FMT("Tests successful!"));
   return true;
 }
 
@@ -919,7 +886,7 @@ bool run_tests() {
 // ###############################################################################
 // handle diagnostic informations given by assertion and abort program execution:
 void __assert(const char *__func, const char *__file, int __lineno, const char *__sexp) {
-  debug("ASSERT FAILED - %s (%s:%i): %s", __func, __file, __lineno, __sexp);
+  debug(FMT("ASSERT FAILED - %s (%s:%i): %s"), __func, __file, __lineno, __sexp);
   Serial.flush();
   // Show something on the screen
   lcd.setCursor(0, 0);
