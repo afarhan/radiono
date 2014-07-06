@@ -180,8 +180,8 @@ void printLine1(char const *c){
 }
 
 void printLine2(char const *c){
-  lcd.setCursor(0, 1);
-  lcd.print(c);
+    lcd.setCursor(0, 1);
+    lcd.print(c);
 }
 
 // ###############################################################################
@@ -781,7 +781,7 @@ void setup() {
   //char *pch = strrchr(__FILE__,'/')+1;
   //lcd.print(pch);
   //delay(2000);
-  printLine2(FLASH("Rev: CA 11 Exp"));
+  printLine2(FLASH("Rev: CA 12 Exp"));
   delay(2000);
   
 

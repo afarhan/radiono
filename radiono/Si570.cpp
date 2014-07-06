@@ -16,11 +16,11 @@
 
 
 // ERB - Buffers that Stores "const stings" to, and Reads from FLASH Memory
-char buf1[60];
+extern char buf[];
 // ERB - Force format stings into FLASH Memory
-#define  FLASH(x) strcpy_P(buf1, PSTR(x))
+#define  FLASH(x) strcpy_P(buf, PSTR(x))
 // FLASH2 can be used where Two small (1/2 size) Buffers are needed.
-#define FLASH2(x) strcpy_P(buf1 + sizeof(buf1)/2, PSTR(x))
+#define FLASH2(x) strcpy_P(buf + sizeof(buf)/2, PSTR(x))
 
 
 //#define IF_FREQ   (19997000L)
