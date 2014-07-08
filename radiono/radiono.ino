@@ -66,7 +66,7 @@
 // Please note, that those are not hardware tests! - Comment this line to save some space.
 //#define RUN_TESTS 1
 
-unsigned long frequency = 14200000UL;
+unsigned long frequency = 14285000UL; //  20m - QRP SSB Calling Freq
 unsigned long vfoA = frequency, vfoB = frequency, ritA, ritB;
 unsigned long cwTimeout = 0;
 
@@ -301,8 +301,8 @@ void setSideband(){
 
 
 // ###############################################################################
-void setPaBandSignal(){
-  // This setup is compatable with the RF386 RF Power Amplifier
+void setRf386BandSignal(){
+  // This setup is compatable with the Minima RF386 RF Power Amplifier
   // See: http://www.hfsignals.org/index.php/RF386
 
   // Bitbang Clock Pulses to Change PA Band Filter
@@ -412,7 +412,7 @@ void checkTuning() {
   deltaFreq = tuningDir;
   for (int i = cursorDigitPosition; i > 1; i-- ) deltaFreq *= 10;
   
-  newFreq = freqPrevious + deltaFreq;  // Save Least Ditits Mode
+  newFreq = freqPrevious + deltaFreq;  // Save Least Digits Mode
   //newFreq = (freqPrevious / abs(deltaFreq)) * abs(deltaFreq) + deltaFreq; // Zero Lesser Digits Mode 
   if (newFreq != frequency) {
       // Update frequency if within range of limits, 
@@ -503,7 +503,7 @@ void checkCW(){
 
 // ###############################################################################
 int btnDown(){
-  int val, val2;
+  int val = -1, val2 = -2;
   
   val = analogRead(FBUTTON);
   while (val != val2) { // DeBounce Button Press
@@ -533,10 +533,12 @@ void deDounceBtnRelease() {
   int i = 2;
   
     while (--i) { // DeBounce Button Release, Check twice
-      while (btnDown()) {
-       delay(20);
-      }
+      while (btnDown()) delay(20);
     }
+    // The following allows the user to re-center the
+    // Tuning POT during any Key Press-n-hold without changing Freq.
+    readTuningPot();
+    tuningPositionPrevious = tuningPosition;
 }
 
 // ###############################################################################
@@ -553,7 +555,7 @@ void checkButton() {
     case 4: decodeSideBandMode(btn); break;
     case 5: decodeBandUpDown(+1); break; // Band Up
     case 6: decodeBandUpDown(-1); break; // Band Down
-    case 7: decodeAux(btn); break; // Report Un Used AUX Buttons
+    case 7: decodeAux(btn); break; // Report Un-Used as AUX Buttons
     default: return;
   }
 }
@@ -562,17 +564,17 @@ void checkButton() {
 // ###############################################################################
 void decodeBandUpDown(int dir) {
   static unsigned long freqCache[] = { // Set Default Values for Cache
-      1900000LU, // 160m
-      3600000LU, //  80m
-      7125000LU, //  40m
-     10120000LU, //  30m
-     14150000LU, //  20m
-     18110000LU, //  17m
-     21200000LU, //  15m
-     24930000LU, //  12m
-     28300000LU, //  10m
+      1825000UL, // 160m - QRP SSB Calling Freq
+      3985000UL, //  80m - QRP SSB Calling Freq
+      7285000UL, //  40m - QRP SSB Calling Freq
+     10138700UL, //  30m - QRP QRSS and WSPR
+     14285000UL, //  20m - QRP SSB Calling Freq
+     18130000UL, //  17m - QRP SSB Calling Freq
+     21385000UL, //  15m - QRP SSB Calling Freq
+     24950000UL, //  12m - QRP SSB Calling Freq
+     28385000UL, //  10m - QRP SSB Calling Freq
    };
-   
+  
    static byte sideBandModeCache[BANDS];
    
    switch (dir) {  // Decode Direction of Band Change
@@ -701,6 +703,7 @@ void decodeFN(int btn) {
   //if the btn is down while tuning pot is not centered, then lock the tuning
   //and return
   
+  // I don't understand this origninal code fragment
   if (freqUnStable) {
     if (locked)
       locked = 0;
@@ -764,26 +767,29 @@ void setup() {
   
   // Initialize the Serial port so that we can use it for debugging
   Serial.begin(115200);
-  lcd.begin(16, 2);
-  
   debug(FLASH("Radiono - Rev: %s"), RADIONO_VERSION);
-  
 
+  lcd.begin(16, 2);
+  printLine1(FLASH("Farhan - Minima"));
+  printLine2(FLASH("  Tranceiver"));
+  delay(2000);
+  
+  sprintf(c, FLASH("Radiono %s"), RADIONO_VERSION);
+  printLine1(c);
+  sprintf(c, FLASH("%-16.16s"), FLASH2("Rev: CC"));
+  printLine2(c);
+  delay(2000);
+  
+  // Print just the File Name, Added by ERB
+  //sprintf(c, FLASH("F: %-13.13s"), FLASH2(__FILE__));
+  //printLine2(c);
+  //delay(2000);
+  
+ 
 #ifdef RUN_TESTS
   run_tests();
 #endif
 
-  printLine1(FLASH("Radiono "));
-  lcd.print(RADIONO_VERSION);
-  
-  // Print just the File Name, Added by ERB
-  //printLine2("F: ");
-  //char *pch = strrchr(__FILE__,'/')+1;
-  //lcd.print(pch);
-  //delay(2000);
-  printLine2(FLASH("Rev: CB"));
-  delay(2000);
-  
 
   // The library automatically reads the factory calibration settings of your Si570
   // but it needs to know for what frequency it was calibrated for.
@@ -792,7 +798,7 @@ void setup() {
   vfo = new Si570(SI570_I2C_ADDRESS, 56320000);
 
   if (vfo->status == SI570_ERROR) {
-    // The Si570 is unreachable. Show an error for 3 seconds and continue.FLASH(
+    // The Si570 is unreachable. Show an error for 3 seconds and continue.
     printLine2(FLASH("Si570 comm error"));
     delay(3000);
   }
@@ -840,7 +846,7 @@ void loop(){
   
   setSideband();
   setBandswitch();
-  setPaBandSignal();
+  setRf386BandSignal();
 
   updateDisplay();
   
@@ -880,6 +886,8 @@ bool run_tests() {
   return true;
 }
 
+#endif
+
 // ###############################################################################
 // ###############################################################################
 // handle diagnostic informations given by assertion and abort program execution:
@@ -888,14 +896,13 @@ void __assert(const char *__func, const char *__file, int __lineno, const char *
   Serial.flush();
   // Show something on the screen
   lcd.setCursor(0, 0);
-  lcd.print("OOPS ");
+  lcd.print(FLASH("OOPS "));
   lcd.print(__file);
   lcd.setCursor(0, 1);
-  lcd.print("Line: ");
+  lcd.print(FLASH("Line: "));
   lcd.print(__lineno);
   // abort program execution.
   abort();
 }
 
-#endif
 

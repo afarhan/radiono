@@ -349,6 +349,6 @@ Si570_Status Si570::setFrequency(uint32_t newfreq)
     write_si570();
   }
   
-    //debug("End: %lu", newfreq); // DEBUG ###
+  debug(FLASH("RFREQ (dec): %lu"), newfreq); // DEBUG ###
   return status;
 }
