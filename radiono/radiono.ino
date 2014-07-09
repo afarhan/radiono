@@ -36,6 +36,10 @@
  */
 #include <Wire.h>
 #include <LiquidCrystal.h>
+#define LCD_COL (16)
+#define LCD_ROW (2)
+#define LCD_STR_CLEAR2END "%-16.16s"
+//#define LCD_STR_CLEAR2END "%-20.20s"  // For 20 Character LCD Display
 
 
 #include <avr/pgmspace.h>
@@ -73,7 +77,7 @@ unsigned long cwTimeout = 0;
 Si570 *vfo;
 LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
 
-char b[21], c[21];  // General Buffers, used mostly for Formating message for LCD
+char b[22], c[22];  // General Buffers, used mostly for Formating message for LCD
 
 /* tuning pot stuff */
 unsigned char refreshDisplay = 0;
@@ -184,6 +188,21 @@ void printLine2(char const *c){
     lcd.print(c);
 }
 
+// Print LCD Line1 with Clear to End
+void printLine1cle(char const *c){
+    char buf[LCD_COL+2];
+    sprintf(buf, LCD_STR_CLEAR2END, c);
+    printLine1(buf);
+}
+
+// Print LCD Line2 with Clear to End
+void printLine2cle(char const *c){
+    char buf[LCD_COL+2];
+    sprintf(buf, LCD_STR_CLEAR2END, c);
+    printLine2(buf);
+}
+
+
 // ###############################################################################
 void displayFrequency(unsigned long f){
   int mhz, khz, hz;
@@ -202,23 +221,22 @@ void updateDisplay(){
   if (refreshDisplay) {
       refreshDisplay = false;
       cursorOff();
+        
+      // Top Line of LCD    
       sprintf(b, FLASH("%08ld"), frequency);
-      
-      // Top Line of LCD
-      sprintf(c, FLASH("%1s:%.2s.%.6s %-4.4s"),
+      sprintf(c, FLASH("%1s:%.2s.%.6s %3.3s"),
           vfoActive == VFO_A ? "A" : "B" ,
           b,  b+2,
           ritOn ? "RIT" : " ");
-      printLine1(c);
+      printLine1cle(c);
       
-      // Bottom Line of LCD
-      
-      sprintf(c, FLASH("%3s%1s %2s %-8.8s"),
+      sprintf(c, FLASH("%3s%1s %2s %3.3s"),
           isLSB ? "LSB" : "USB",
           sideBandMode > 0 ? "*" : " ",
           inTx ? "TX" : "RX",
           freqUnStable ? " " : vfoStatus[vfo->status]);
-      printLine2(c);
+      printLine2cle(c);
+      
       
       setCursorCRM(11 - (cursorDigitPosition + (cursorDigitPosition>6) ), 0, CURSOR_MODE);
   }
@@ -632,8 +650,9 @@ void decodeSideBandMode(int btn) {
   sideBandMode %= 3; // Limit to Three Modes
   setSideband();
   cursorOff();
-  sprintf(c, FLASH("%-16.16s"), (char *)pgm_read_word(&sideBandText[sideBandMode]));
-  printLine2(c);
+  //sprintf(c, LCD_STR_CLEAR2END, (char *)pgm_read_word(&sideBandText[sideBandMode]));
+  //printLine2(c);
+  printLine2cle((char *)pgm_read_word(&sideBandText[sideBandMode]));
   deDounceBtnRelease(); // Wait for Release
   refreshDisplay++;
   updateDisplay();
@@ -733,8 +752,9 @@ void decodeFN(int btn) {
       updateDisplay();
       cursorOff();
       
-      sprintf(c, FLASH("%-16.16s"), FLASH2("VFO swap!"));
-      printLine2(c);
+      //sprintf(c, LCD_STR_CLEAR2END, FLASH2("VFO swap!"));
+      //printLine2(c);
+      printLine2cle(FLASH("VFO swap!"));
       break;
       
     case LONG_PRESS:
@@ -743,8 +763,9 @@ void decodeFN(int btn) {
       refreshDisplay++;
       updateDisplay();
       cursorOff();
-      sprintf(c, FLASH("%-16.16s"), FLASH2("VFO reset!"));
-      printLine2(c);
+      //sprintf(c, LCD_STR_CLEAR2END, FLASH2("VFO reset!"));
+      //printLine2(c);
+      printLine2cle(FLASH("VFO reset!"));
       break;
     default:
       return;
@@ -769,15 +790,18 @@ void setup() {
   Serial.begin(115200);
   debug(FLASH("Radiono - Rev: %s"), RADIONO_VERSION);
 
-  lcd.begin(16, 2);
+  lcd.begin(LCD_COL, LCD_ROW);
   printLine1(FLASH("Farhan - Minima"));
   printLine2(FLASH("  Tranceiver"));
   delay(2000);
   
-  sprintf(c, FLASH("Radiono %s"), RADIONO_VERSION);
-  printLine1(c);
-  sprintf(c, FLASH("%-16.16s"), FLASH2("Rev: CC"));
-  printLine2(c);
+  sprintf(b, FLASH("Radiono %s"), RADIONO_VERSION);
+  //sprintf(c, LCD_STR_CLEAR2END, b);
+  //printLine1(c);
+  printLine1cle(b);
+  //sprintf(c, LCD_STR_CLEAR2END, FLASH2("Rev: CC.03"));
+  //printLine2(c);
+  printLine2cle(FLASH2("Rev: CC.02"));
   delay(2000);
   
   // Print just the File Name, Added by ERB
@@ -803,8 +827,9 @@ void setup() {
     delay(3000);
   }
   
-  sprintf(c, FLASH("%-16.16s"), " ");
-  printLine2(c);
+  //sprintf(c, LCD_STR_CLEAR2END, " ");
+  //printLine2(c);
+  printLine2cle(" ");
  
   // This will print some debugging info to the serial console.
   vfo->debugSi570();
