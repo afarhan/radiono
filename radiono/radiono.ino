@@ -38,8 +38,8 @@
 #include <LiquidCrystal.h>
 #define LCD_COL (16)
 #define LCD_ROW (2)
-#define LCD_STR_CLEAR2END "%-16.16s"
-//#define LCD_STR_CLEAR2END "%-20.20s"  // For 20 Character LCD Display
+#define LCD_STR_CEL "%-16.16s"
+//#define LCD_STR_CEL "%-20.20s"  // For 20 Character LCD Display
 
 
 #include <avr/pgmspace.h>
@@ -65,10 +65,6 @@
 //#define IF_FREQ   (0)  // FOR DEBUG ONLY
 #define IF_FREQ   (19997000L) //this is for usb, we should probably have the USB and LSB frequencies separately
 #define CW_TIMEOUT (600L) // in milliseconds, this is the parameter that determines how long the tx will hold between cw key downs
-
-// When RUN_TESTS is 1, the Radiono will automatically do some software testing when it starts.
-// Please note, that those are not hardware tests! - Comment this line to save some space.
-//#define RUN_TESTS 1
 
 unsigned long frequency = 14285000UL; //  20m - QRP SSB Calling Freq
 unsigned long vfoA = frequency, vfoB = frequency, ritA, ritB;
@@ -124,7 +120,7 @@ char buf[60];
 
 
 // PROGMEM is used to avoid using the small available variable space
-prog_uint32_t bands[] PROGMEM = {  // Lower and Upper Band Limits
+const prog_uint32_t bandLimits[] PROGMEM = {  // Lower and Upper Band Limits
       1800000UL,  2000000UL, // 160m
       3500000UL,  4000000UL, //  80m
       7000000UL,  7300000UL, //  40m
@@ -136,7 +132,7 @@ prog_uint32_t bands[] PROGMEM = {  // Lower and Upper Band Limits
      28000000UL, 29700000UL, //  10m
    };
    
-#define BANDS (sizeof(bands)/sizeof(prog_uint32_t)/2)
+#define BANDS (sizeof(bandLimits)/sizeof(prog_uint32_t)/2)
 
 // End ERB add
 
@@ -188,33 +184,22 @@ void printLine2(char const *c){
     lcd.print(c);
 }
 
-// Print LCD Line1 with Clear to End
-void printLine1cle(char const *c){
+// Print LCD Line1 with Clear to End of Line
+void printLine1CEL(char const *c){
     char buf[LCD_COL+2];
-    sprintf(buf, LCD_STR_CLEAR2END, c);
+    sprintf(buf, LCD_STR_CEL, c);
     printLine1(buf);
 }
 
-// Print LCD Line2 with Clear to End
-void printLine2cle(char const *c){
+// Print LCD Line2 with Clear to End of Line
+void printLine2CEL(char const *c){
     char buf[LCD_COL+2];
-    sprintf(buf, LCD_STR_CLEAR2END, c);
+    sprintf(buf, LCD_STR_CEL, c);
     printLine2(buf);
 }
 
 
 // ###############################################################################
-void displayFrequency(unsigned long f){
-  int mhz, khz, hz;
-
-  mhz = f / 1000000l;
-  khz = (f % 1000000l)/1000;
-  hz = f % 1000l;
-  sprintf(b, FLASH("[%02d.%03d.%03d]"), mhz, khz, hz);
-  printLine1(b);
-}
-
-
 void updateDisplay(){
   char const *vfoStatus[] = { "ERR", "RDY", "BIG", "SML" };
    
@@ -228,14 +213,14 @@ void updateDisplay(){
           vfoActive == VFO_A ? "A" : "B" ,
           b,  b+2,
           ritOn ? "RIT" : " ");
-      printLine1cle(c);
+      printLine1CEL(c);
       
       sprintf(c, FLASH("%3s%1s %2s %3.3s"),
           isLSB ? "LSB" : "USB",
           sideBandMode > 0 ? "*" : " ",
           inTx ? "TX" : "RX",
           freqUnStable ? " " : vfoStatus[vfo->status]);
-      printLine2cle(c);
+      printLine2CEL(c);
       
       
       setCursorCRM(11 - (cursorDigitPosition + (cursorDigitPosition>6) ), 0, CURSOR_MODE);
@@ -446,7 +431,7 @@ void checkTuning() {
 }
 
 
-// ###############################################################################
+// ########################################################################-v #######
 void checkTX(){
   
   if (freqUnStable) return;
@@ -533,7 +518,6 @@ int btnDown(){
   if (val>1000) return 0;
   // 47K Pull-up, and 4.7K switch resistors,
   // Val should be approximately = (btnN×4700)÷(47000+4700)×1023
-  //sprintf(c,"Val= %d            ", val); printLine2(c); delay(1000);  // For Debug Only
   
   debug(FLASH("btn Val= %d"), val);
   
@@ -599,8 +583,8 @@ void decodeBandUpDown(int dir) {
      
      case +1:  // For Band Change, Up
        for (int i = 0; i < BANDS; i++) {
-         if (frequency <= pgm_read_dword(&bands[i*2+1])) {
-           if (frequency >= pgm_read_dword(&bands[i*2])) {
+         if (frequency <= pgm_read_dword(&bandLimits[i*2+1])) {
+           if (frequency >= pgm_read_dword(&bandLimits[i*2])) {
              // Save Current Ham frequency and sideBandMode
              freqCache[i] = frequency;
              sideBandModeCache[i] = sideBandMode;
@@ -617,8 +601,8 @@ void decodeBandUpDown(int dir) {
      
      case -1:  // For Band Change, Down
        for (int i = BANDS-1; i > 0; i--) {
-         if (frequency >= pgm_read_dword(&bands[i*2])) {
-           if (frequency <= pgm_read_dword(&bands[i*2+1])) {
+         if (frequency >= pgm_read_dword(&bandLimits[i*2])) {
+           if (frequency <= pgm_read_dword(&bandLimits[i*2+1])) {
              // Save Current Ham frequency and sideBandMode
              freqCache[i] = frequency;
              sideBandModeCache[i] = sideBandMode;
@@ -650,9 +634,7 @@ void decodeSideBandMode(int btn) {
   sideBandMode %= 3; // Limit to Three Modes
   setSideband();
   cursorOff();
-  //sprintf(c, LCD_STR_CLEAR2END, (char *)pgm_read_word(&sideBandText[sideBandMode]));
-  //printLine2(c);
-  printLine2cle((char *)pgm_read_word(&sideBandText[sideBandMode]));
+  printLine2CEL((char *)pgm_read_word(&sideBandText[sideBandMode]));
   deDounceBtnRelease(); // Wait for Release
   refreshDisplay++;
   updateDisplay();
@@ -679,8 +661,8 @@ void decodeAux(int btn) {
   
   //debug("Aux %d", btn);
   cursorOff();
-  sprintf(c, FLASH("Btn: %.2d%9s"), btn, " ");
-  printLine2(c);
+  sprintf(c, FLASH("Btn: %.2d"), btn);
+  printLine2CEL(c);
   deDounceBtnRelease(); // Wait for Button Release
   refreshDisplay++;
   updateDisplay();
@@ -752,9 +734,7 @@ void decodeFN(int btn) {
       updateDisplay();
       cursorOff();
       
-      //sprintf(c, LCD_STR_CLEAR2END, FLASH2("VFO swap!"));
-      //printLine2(c);
-      printLine2cle(FLASH("VFO swap!"));
+      printLine2CEL(FLASH("VFO swap!"));
       break;
       
     case LONG_PRESS:
@@ -763,9 +743,7 @@ void decodeFN(int btn) {
       refreshDisplay++;
       updateDisplay();
       cursorOff();
-      //sprintf(c, LCD_STR_CLEAR2END, FLASH2("VFO reset!"));
-      //printLine2(c);
-      printLine2cle(FLASH("VFO reset!"));
+      printLine2CEL(FLASH("VFO reset!"));
       break;
     default:
       return;
@@ -796,24 +774,16 @@ void setup() {
   delay(2000);
   
   sprintf(b, FLASH("Radiono %s"), RADIONO_VERSION);
-  //sprintf(c, LCD_STR_CLEAR2END, b);
-  //printLine1(c);
-  printLine1cle(b);
-  //sprintf(c, LCD_STR_CLEAR2END, FLASH2("Rev: CC.03"));
-  //printLine2(c);
-  printLine2cle(FLASH2("Rev: CC.02"));
+  printLine1CEL(b);
+  
+  printLine2CEL(FLASH2("Rev: CC.04"));
   delay(2000);
   
   // Print just the File Name, Added by ERB
   //sprintf(c, FLASH("F: %-13.13s"), FLASH2(__FILE__));
-  //printLine2(c);
+  //printLine2CLE(c);
   //delay(2000);
   
- 
-#ifdef RUN_TESTS
-  run_tests();
-#endif
-
 
   // The library automatically reads the factory calibration settings of your Si570
   // but it needs to know for what frequency it was calibrated for.
@@ -823,13 +793,11 @@ void setup() {
 
   if (vfo->status == SI570_ERROR) {
     // The Si570 is unreachable. Show an error for 3 seconds and continue.
-    printLine2(FLASH("Si570 comm error"));
+    printLine2CEL(FLASH("Si570 comm error"));
     delay(3000);
   }
   
-  //sprintf(c, LCD_STR_CLEAR2END, " ");
-  //printLine2(c);
-  printLine2cle(" ");
+  printLine2CEL(" ");
  
   // This will print some debugging info to the serial console.
   vfo->debugSi570();
@@ -882,39 +850,6 @@ void loop(){
 // ###############################################################################
 // ###############################################################################
 
-
-// ###############################################################################
-// ###############################################################################
-#ifdef RUN_TESTS
-
-bool run_tests() {
-  /* Those tests check that the Si570 libary is able to understand the
-   * register values provided and do the required math with them.
-   */
-  // Testing for thomas - si570
-  {
-    uint8_t registers[] = { 0xe1, 0xc2, 0xb5, 0x7c, 0x77, 0x70 };
-    vfo = new Si570(registers, 56320000);
-    assert(vfo->getFreqXtal() == 114347712);
-    delete(vfo);
-  }
-
-  // Testing Jerry - si570
-  {
-    uint8_t registers[] = { 0xe1, 0xc2, 0xb6, 0x36, 0xbf, 0x42 };
-    vfo = new Si570(registers, 56320000);
-    assert(vfo->getFreqXtal() == 114227856);
-    delete(vfo);
-  }
-
-  Serial.println(FLASH("Tests successful!"));
-  return true;
-}
-
-#endif
-
-// ###############################################################################
-// ###############################################################################
 // handle diagnostic informations given by assertion and abort program execution:
 void __assert(const char *__func, const char *__file, int __lineno, const char *__sexp) {
   debug(FLASH("ASSERT FAILED - %s (%s:%i): %s"), __func, __file, __lineno, __sexp);
