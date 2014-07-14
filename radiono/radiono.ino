@@ -114,9 +114,9 @@ int sideBandMode = 0;
 // ERB - Buffers that Stores "const stings" to, and Reads from FLASH Memory
 char buf[60];
 // ERB - Force format stings into FLASH Memory
-#define  FLASH(x) strcpy_P(buf, PSTR(x))
+#define  P(x) strcpy_P(buf, PSTR(x))
 // FLASH2 can be used where Two small (1/2 size) Buffers are needed.
-#define FLASH2(x) strcpy_P(buf + sizeof(buf)/2, PSTR(x))
+#define P2(x) strcpy_P(buf + sizeof(buf)/2, PSTR(x))
 
 
 // PROGMEM is used to avoid using the small available variable space
@@ -208,14 +208,14 @@ void updateDisplay(){
       cursorOff();
         
       // Top Line of LCD    
-      sprintf(b, FLASH("%08ld"), frequency);
-      sprintf(c, FLASH("%1s:%.2s.%.6s %3.3s"),
+      sprintf(b, P("%08ld"), frequency);
+      sprintf(c, P("%1s:%.2s.%.6s %3.3s"),
           vfoActive == VFO_A ? "A" : "B" ,
           b,  b+2,
           ritOn ? "RIT" : " ");
       printLine1CEL(c);
       
-      sprintf(c, FLASH("%3s%1s %2s %3.3s"),
+      sprintf(c, P("%3s%1s %2s %3.3s"),
           isLSB ? "LSB" : "USB",
           sideBandMode > 0 ? "*" : " ",
           inTx ? "TX" : "RX",
@@ -324,7 +324,7 @@ void setRf386BandSignal(){
   prevBand = band;
   
   
-  debug(FLASH("BandI = %d"), band);
+  debug(P("BandI = %d"), band);
 
   digitalWrite(PA_BAND_CLK, 1);  // Output Reset Pulse for PA Band Filter
   delay(500);
@@ -341,7 +341,7 @@ void setRf386BandSignal(){
 // -------------------------------------------------------------------------------
 int freq2Band(){
   
-  //debug(FLASH("Freq = %lu"), frequency);
+  //debug(P("Freq = %lu"), frequency);
   
   if (frequency <  4000000UL) return 4; //   3.5 MHz
   if (frequency < 10200000UL) return 3; //  7-10 MHz
@@ -519,7 +519,7 @@ int btnDown(){
   // 47K Pull-up, and 4.7K switch resistors,
   // Val should be approximately = (btnN×4700)÷(47000+4700)×1023
   
-  debug(FLASH("btn Val= %d"), val);
+  debug(P("btn Val= %d"), val);
   
   if (val > 350) return 7;
   if (val > 300) return 6;
@@ -547,7 +547,7 @@ void deDounceBtnRelease() {
 void checkButton() {
   int btn;
   btn = btnDown();
-  if (btn) debug(FLASH("btn %d"), btn);
+  if (btn) debug(P("btn %d"), btn);
   
   switch (btn) {
     case 0: return; // Abort
@@ -661,7 +661,7 @@ void decodeAux(int btn) {
   
   //debug("Aux %d", btn);
   cursorOff();
-  sprintf(c, FLASH("Btn: %.2d"), btn);
+  sprintf(c, P("Btn: %.2d"), btn);
   printLine2CEL(c);
   deDounceBtnRelease(); // Wait for Button Release
   refreshDisplay++;
@@ -734,7 +734,7 @@ void decodeFN(int btn) {
       updateDisplay();
       cursorOff();
       
-      printLine2CEL(FLASH("VFO swap!"));
+      printLine2CEL(P("VFO swap!"));
       break;
       
     case LONG_PRESS:
@@ -743,7 +743,7 @@ void decodeFN(int btn) {
       refreshDisplay++;
       updateDisplay();
       cursorOff();
-      printLine2CEL(FLASH("VFO reset!"));
+      printLine2CEL(P("VFO reset!"));
       break;
     default:
       return;
@@ -766,21 +766,21 @@ void setup() {
   
   // Initialize the Serial port so that we can use it for debugging
   Serial.begin(115200);
-  debug(FLASH("Radiono - Rev: %s"), RADIONO_VERSION);
+  debug(P("Radiono - Rev: %s"), RADIONO_VERSION);
 
   lcd.begin(LCD_COL, LCD_ROW);
-  printLine1(FLASH("Farhan - Minima"));
-  printLine2(FLASH("  Tranceiver"));
+  printLine1(P("Farhan - Minima"));
+  printLine2(P("  Tranceiver"));
   delay(2000);
   
-  sprintf(b, FLASH("Radiono %s"), RADIONO_VERSION);
+  sprintf(b, P("Radiono %s"), RADIONO_VERSION);
   printLine1CEL(b);
   
-  printLine2CEL(FLASH2("Rev: CC.04"));
+  printLine2CEL(P2("Rev: CC.05"));
   delay(2000);
   
   // Print just the File Name, Added by ERB
-  //sprintf(c, FLASH("F: %-13.13s"), FLASH2(__FILE__));
+  //sprintf(c, P("F: %-13.13s"), P2(__FILE__));
   //printLine2CLE(c);
   //delay(2000);
   
@@ -793,7 +793,7 @@ void setup() {
 
   if (vfo->status == SI570_ERROR) {
     // The Si570 is unreachable. Show an error for 3 seconds and continue.
-    printLine2CEL(FLASH("Si570 comm error"));
+    printLine2CEL(P("Si570 comm error"));
     delay(3000);
   }
   
@@ -852,14 +852,14 @@ void loop(){
 
 // handle diagnostic informations given by assertion and abort program execution:
 void __assert(const char *__func, const char *__file, int __lineno, const char *__sexp) {
-  debug(FLASH("ASSERT FAILED - %s (%s:%i): %s"), __func, __file, __lineno, __sexp);
+  debug(P("ASSERT FAILED - %s (%s:%i): %s"), __func, __file, __lineno, __sexp);
   Serial.flush();
   // Show something on the screen
   lcd.setCursor(0, 0);
-  lcd.print(FLASH("OOPS "));
+  lcd.print(P("OOPS "));
   lcd.print(__file);
   lcd.setCursor(0, 1);
-  lcd.print(FLASH("Line: "));
+  lcd.print(P("Line: "));
   lcd.print(__lineno);
   // abort program execution.
   abort();
