@@ -101,6 +101,7 @@ unsigned char refreshDisplay = 0;
 
 int tuningDir = 0;
 int tuningPosition = 0;
+int tune2500Mode = 0;
 int freqUnStable = 1;
 int tuningPositionDelta = 0;
 int cursorDigitPosition = 0;
@@ -209,10 +210,11 @@ void updateDisplay(){
         
       // Top Line of LCD    
       sprintf(b, P("%08ld"), frequency);
-      sprintf(c, P("%1s:%.2s.%.6s %3.3s"),
+      sprintf(c, P("%1s:%.2s.%.6s %3.3s%c"),
           vfoActive == VFO_A ? "A" : "B" ,
           b,  b+2,
-          ritOn ? "RIT" : " ");
+          ritOn ? "RIT" : " ",
+          tune2500Mode ? "K": " ");
       printLine1CEL(c);
       
       sprintf(c, P("%3s%1s %2s %3.3s"),
@@ -411,11 +413,22 @@ void checkTuning() {
   
   if (cursorDigitPosition < 1) return; // Nothing to do here, Abort, Cursor is in Park position
 
-  // Compute deltaFreq based on current Cursor Position Digit
-  deltaFreq = tuningDir;
-  for (int i = cursorDigitPosition; i > 1; i-- ) deltaFreq *= 10;
+  // Select Tuning Mode; Digit or 2500 Step Mode
+  if (tune2500Mode) {
+      // Inc or Dec Freq by 2.5K, useful when tuning between SSB stations
+      cursorDigitPosition = 3;
+      deltaFreq += tuningDir * 2500;
+      
+      newFreq = (freqPrevious / 2500) * 2500 + deltaFreq;
+  }
+  else {
+      // Compute deltaFreq based on current Cursor Position Digit
+      deltaFreq = tuningDir;
+      for (int i = cursorDigitPosition; i > 1; i-- ) deltaFreq *= 10;
   
-  newFreq = freqPrevious + deltaFreq;  // Save Least Digits Mode
+      newFreq = freqPrevious + deltaFreq;  // Save Least Digits Mode
+  }
+  
   //newFreq = (freqPrevious / abs(deltaFreq)) * abs(deltaFreq) + deltaFreq; // Zero Lesser Digits Mode 
   if (newFreq != frequency) {
       // Update frequency if within range of limits, 
@@ -557,11 +570,17 @@ void checkButton() {
     case 4: decodeSideBandMode(btn); break;
     case 5: decodeBandUpDown(+1); break; // Band Up
     case 6: decodeBandUpDown(-1); break; // Band Down
-    case 7: decodeAux(btn); break; // Report Un-Used as AUX Buttons
+    case 7: decodeTune2500Mode(); break; // Report Un-Used as AUX Buttons
     default: return;
   }
 }
 
+
+// ###############################################################################
+void decodeTune2500Mode() {
+    if (tune2500Mode) cursorDigitPosition = 2; // Set default Tuning Digit
+    tune2500Mode != tune2500Mode;
+}
 
 // ###############################################################################
 void decodeBandUpDown(int dir) {
@@ -776,7 +795,7 @@ void setup() {
   sprintf(b, P("Radiono %s"), RADIONO_VERSION);
   printLine1CEL(b);
   
-  printLine2CEL(P2("Rev: CC.05"));
+  printLine2CEL(P2("Rev: CC.06"));
   delay(2000);
   
   // Print just the File Name, Added by ERB
