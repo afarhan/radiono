@@ -22,13 +22,10 @@
  *
  */
 
+//#define RADIONO_VERSION "0.4"
+#define RADIONO_VERSION "0.4.erb" // Modifications by: Eldon R. Brown - WA0UWH
+#define LOCAL_REV "CC.08"         // Incremental Rev Code
 
-/*
- * A Long line, to allow for left right scrole, for program construct alignment --------------------------------------------------------------------
- */
-
-#define __ASSERT_USE_STDERR
-#include <assert.h>
 
 /*
  * Wire is only used from the Si570 module but we need to list it here so that
@@ -47,9 +44,6 @@
 #include "Si570.h"
 #include "debug.h"
 
-//#define RADIONO_VERSION "0.4"
-#define RADIONO_VERSION "0.4.erb" // Modifications by: Eldon R. Brown - WA0UWH
-
 /*
  The 16x2 LCD is connected as follows:
     LCD's PIN   Raduino's PIN  PURPOSE      ATMEGA328's PIN
@@ -66,19 +60,6 @@
 #define IF_FREQ   (19997000L) //this is for usb, we should probably have the USB and LSB frequencies separately
 #define CW_TIMEOUT (600L) // in milliseconds, this is the parameter that determines how long the tx will hold between cw key downs
 
-unsigned long frequency = 14285000UL; //  20m - QRP SSB Calling Freq
-unsigned long vfoA = frequency, vfoB = frequency, ritA, ritB;
-unsigned long cwTimeout = 0;
-
-Si570 *vfo;
-LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
-
-char b[22], c[22];  // General Buffers, used mostly for Formating message for LCD
-
-/* tuning pot stuff */
-unsigned char refreshDisplay = 0;
-
-// Added by ERB
 #define MAX_FREQ (30000000UL)
 
 #define DEAD_ZONE (40)
@@ -99,6 +80,34 @@ unsigned char refreshDisplay = 0;
 #define UPPER_SIDEBAND_MODE (1)
 #define LOWER_SIDEBAND_MODE (2)
 
+/* the digital controls */
+#define LSB (2)
+#define TX_RX (3)
+#define CW_KEY (4)
+
+#define BAND_HI (5)
+#define PA_BAND_CLK (7)
+
+#define FBUTTON (A3)
+#define ANALOG_TUNING (A2)
+#define ANALOG_KEYER (A1)
+
+#define VFO_A 0
+#define VFO_B 1
+
+
+unsigned long frequency = 14285000UL; //  20m - QRP SSB Calling Freq
+unsigned long vfoA = frequency, vfoB = frequency, ritA, ritB;
+unsigned long cwTimeout = 0;
+
+Si570 *vfo;
+LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
+
+char b[LCD_COL+6], c[LCD_COL+6];  // General Buffers, used mostly for Formating message for LCD
+
+/* tuning pot stuff */
+unsigned char refreshDisplay = 0;
+
 int tuningDir = 0;
 int tuningPosition = 0;
 int tune2500Mode = 0;
@@ -113,7 +122,7 @@ char* const sideBandText[] PROGMEM = {"Auto SB","USB","LSB"};
 int sideBandMode = 0;
 
 // ERB - Buffers that Stores "const stings" to, and Reads from FLASH Memory
-char buf[60];
+char buf[64+2];
 // ERB - Force format stings into FLASH Memory
 #define  P(x) strcpy_P(buf, PSTR(x))
 // FLASH2 can be used where Two small (1/2 size) Buffers are needed.
@@ -135,27 +144,8 @@ const prog_uint32_t bandLimits[] PROGMEM = {  // Lower and Upper Band Limits
    
 #define BANDS (sizeof(bandLimits)/sizeof(prog_uint32_t)/2)
 
-// End ERB add
 
-
-unsigned char locked = 0; //the tuning can be locked: wait until it goes into dead-zone before unlocking it
-
-/* the digital controls */
-
-#define LSB (2)
-#define TX_RX (3)
-#define CW_KEY (4)
-
-#define BAND_HI (5)
-#define PA_BAND_CLK (7)
-
-#define FBUTTON (A3)
-#define ANALOG_TUNING (A2)
-#define ANALOG_KEYER (A1)
-
-#define VFO_A 0
-#define VFO_B 1
-
+unsigned char locked = 0; //the tuning can be locked: wait until Freq Stable before unlocking it
 char inTx = 0;
 char keyDown = 0;
 char isLSB = 0;
@@ -165,8 +155,6 @@ char vfoActive = VFO_A;
 /* modes */
 unsigned char isManual = 1;
 unsigned ritOn = 0;
-
-/* dds ddschip(DDS9850, 5, 6, 7, 125000000LL); */
 
 // ###############################################################################
 // ###############################################################################
@@ -187,16 +175,16 @@ void printLine2(char const *c){
 
 // Print LCD Line1 with Clear to End of Line
 void printLine1CEL(char const *c){
-    char buf[LCD_COL+2];
-    sprintf(buf, LCD_STR_CEL, c);
-    printLine1(buf);
+    char lbuf[LCD_COL+2];
+    sprintf(lbuf, LCD_STR_CEL, c);
+    printLine1(lbuf);
 }
 
 // Print LCD Line2 with Clear to End of Line
 void printLine2CEL(char const *c){
-    char buf[LCD_COL+2];
-    sprintf(buf, LCD_STR_CEL, c);
-    printLine2(buf);
+    char lbuf[LCD_COL+2];
+    sprintf(lbuf, LCD_STR_CEL, c);
+    printLine2(lbuf);
 }
 
 
@@ -325,7 +313,6 @@ void setRf386BandSignal(){
   if (band == prevBand) return;
   prevBand = band;
   
-  
   debug(P("BandI = %d"), band);
 
   digitalWrite(PA_BAND_CLK, 1);  // Output Reset Pulse for PA Band Filter
@@ -364,11 +351,11 @@ void setBandswitch(){
   }
 }
 
+
 // ###############################################################################
 void readTuningPot(){
     tuningPosition = analogRead(ANALOG_TUNING);
 }
-
 
 
 // ###############################################################################
@@ -515,8 +502,6 @@ void checkCW(){
 }
 
 
-
-
 // ###############################################################################
 int btnDown(){
   int val = -1, val2 = -2;
@@ -556,6 +541,7 @@ void deDounceBtnRelease() {
     tuningPositionPrevious = tuningPosition;
 }
 
+
 // ###############################################################################
 void checkButton() {
   int btn;
@@ -581,6 +567,7 @@ void decodeTune2500Mode() {
     if (tune2500Mode) cursorDigitPosition = 2; // Set default Tuning Digit
     tune2500Mode != tune2500Mode;
 }
+
 
 // ###############################################################################
 void decodeBandUpDown(int dir) {
@@ -659,6 +646,8 @@ void decodeSideBandMode(int btn) {
   updateDisplay();
   
 }
+
+
 // ###############################################################################
 void decodeMoveCursor(int btn) {
   
@@ -676,8 +665,8 @@ void decodeMoveCursor(int btn) {
       deDounceBtnRelease(); // Wait for Button Release
 }
 
+// -------------------------------------------------------------------------------
 void decodeAux(int btn) {
-  
   //debug("Aux %d", btn);
   cursorOff();
   sprintf(c, P("Btn: %.2d"), btn);
@@ -686,6 +675,7 @@ void decodeAux(int btn) {
   refreshDisplay++;
   updateDisplay();
 }
+
 
 // ###############################################################################
 int getButtonPushMode(int btn) {
@@ -715,7 +705,6 @@ int getButtonPushMode(int btn) {
     return LONG_PRESS;
   }
 }
-
 
 
 // ###############################################################################
@@ -778,8 +767,6 @@ void decodeFN(int btn) {
 // ###############################################################################
 // ###############################################################################
 
-
-// ###############################################################################
 // ###############################################################################
 void setup() {
   
@@ -795,7 +782,8 @@ void setup() {
   sprintf(b, P("Radiono %s"), RADIONO_VERSION);
   printLine1CEL(b);
   
-  printLine2CEL(P2("Rev: CC.06"));
+  sprintf(b, P("Rev: %s"), LOCAL_REV);
+  printLine2CEL(b);
   delay(2000);
   
   // Print just the File Name, Added by ERB
@@ -865,23 +853,5 @@ void loop(){
 }
 
 // ###############################################################################
-// ###############################################################################
-// ###############################################################################
-// ###############################################################################
 
-// handle diagnostic informations given by assertion and abort program execution:
-void __assert(const char *__func, const char *__file, int __lineno, const char *__sexp) {
-  debug(P("ASSERT FAILED - %s (%s:%i): %s"), __func, __file, __lineno, __sexp);
-  Serial.flush();
-  // Show something on the screen
-  lcd.setCursor(0, 0);
-  lcd.print(P("OOPS "));
-  lcd.print(__file);
-  lcd.setCursor(0, 1);
-  lcd.print(P("Line: "));
-  lcd.print(__lineno);
-  // abort program execution.
-  abort();
-}
-
-
+//End
