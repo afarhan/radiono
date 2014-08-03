@@ -22,13 +22,10 @@
  *
  */
 
+//#define RADIONO_VERSION "0.4"
+#define RADIONO_VERSION "0.4.erb" // Modifications by: Eldon R. Brown - WA0UWH
+#define INC_REV "CC.13"           // Incremental Rev Code
 
-/*
- * A Long line, to allow for left right scrole, for program construct alignment --------------------------------------------------------------------
- */
-
-#define __ASSERT_USE_STDERR
-#include <assert.h>
 
 /*
  * Wire is only used from the Si570 module but we need to list it here so that
@@ -37,14 +34,16 @@
 #include <Wire.h>
 #include <LiquidCrystal.h>
 
+#define LCD_COL (16)
+#define LCD_ROW (2)
+#define LCD_STR_CEL "%-16.16s"
+//#define LCD_STR_CEL "%-20.20s"  // For 20 Character LCD Display
+
 
 #include <avr/pgmspace.h>
 #include <avr/io.h>
 #include "Si570.h"
 #include "debug.h"
-
-//#define RADIONO_VERSION "0.4"
-#define RADIONO_VERSION "0.4.erb" // Modifications by: Eldon R. Brown - WA0UWH
 
 /*
  The 16x2 LCD is connected as follows:
@@ -62,23 +61,6 @@
 #define IF_FREQ   (19997000L) //this is for usb, we should probably have the USB and LSB frequencies separately
 #define CW_TIMEOUT (600L) // in milliseconds, this is the parameter that determines how long the tx will hold between cw key downs
 
-// When RUN_TESTS is 1, the Radiono will automatically do some software testing when it starts.
-// Please note, that those are not hardware tests! - Comment this line to save some space.
-//#define RUN_TESTS 1
-
-unsigned long frequency = 14285000UL; //  20m - QRP SSB Calling Freq
-unsigned long vfoA = frequency, vfoB = frequency, ritA, ritB;
-unsigned long cwTimeout = 0;
-
-Si570 *vfo;
-LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
-
-char b[21], c[21];  // General Buffers, used mostly for Formating message for LCD
-
-/* tuning pot stuff */
-unsigned char refreshDisplay = 0;
-
-// Added by ERB
 #define MAX_FREQ (30000000UL)
 
 #define DEAD_ZONE (40)
@@ -99,48 +81,7 @@ unsigned char refreshDisplay = 0;
 #define UPPER_SIDEBAND_MODE (1)
 #define LOWER_SIDEBAND_MODE (2)
 
-int tuningDir = 0;
-int tuningPosition = 0;
-int freqUnStable = 1;
-int tuningPositionDelta = 0;
-int cursorDigitPosition = 0;
-int tuningPositionPrevious = 0;
-int cursorCol, cursorRow, cursorMode;
-int winkOn;
-unsigned long freqPrevious;
-char* const sideBandText[] PROGMEM = {"Auto SB","USB","LSB"};
-int sideBandMode = 0;
-
-// ERB - Buffers that Stores "const stings" to, and Reads from FLASH Memory
-char buf[60];
-// ERB - Force format stings into FLASH Memory
-#define  FLASH(x) strcpy_P(buf, PSTR(x))
-// FLASH2 can be used where Two small (1/2 size) Buffers are needed.
-#define FLASH2(x) strcpy_P(buf + sizeof(buf)/2, PSTR(x))
-
-
-// PROGMEM is used to avoid using the small available variable space
-prog_uint32_t bands[] PROGMEM = {  // Lower and Upper Band Limits
-      1800000UL,  2000000UL, // 160m
-      3500000UL,  4000000UL, //  80m
-      7000000UL,  7300000UL, //  40m
-     10100000UL, 10150000UL, //  30m
-     14000000UL, 14350000UL, //  20m
-     18068000UL, 18168000UL, //  17m
-     21000000UL, 21450000UL, //  15m
-     24890000UL, 24990000UL, //  12m
-     28000000UL, 29700000UL, //  10m
-   };
-   
-#define BANDS (sizeof(bands)/sizeof(prog_uint32_t)/2)
-
-// End ERB add
-
-
-unsigned char locked = 0; //the tuning can be locked: wait until it goes into dead-zone before unlocking it
-
 /* the digital controls */
-
 #define LSB (2)
 #define TX_RX (3)
 #define CW_KEY (4)
@@ -155,6 +96,56 @@ unsigned char locked = 0; //the tuning can be locked: wait until it goes into de
 #define VFO_A 0
 #define VFO_B 1
 
+
+Si570 *vfo;
+LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
+
+unsigned long frequency = 14285000UL; //  20m - QRP SSB Calling Freq
+unsigned long vfoA = frequency, vfoB = frequency, ritA, ritB;
+unsigned long cwTimeout = 0;
+
+char b[LCD_COL+6], c[LCD_COL+6];  // General Buffers, used mostly for Formating message for LCD
+
+/* tuning pot stuff */
+unsigned char refreshDisplay = 0;
+
+int tuningDir = 0;
+int tuningPosition = 0;
+int tune2500Mode = 0;
+int freqUnStable = 1;
+int tuningPositionDelta = 0;
+int cursorDigitPosition = 0;
+int tuningPositionPrevious = 0;
+int cursorCol, cursorRow, cursorMode;
+int winkOn;
+char* const sideBandText[] PROGMEM = {"Auto SB","USB","LSB"};
+int sideBandMode = 0;
+
+// ERB - Buffers that Stores "const stings" to, and Reads from FLASH Memory
+char buf[64+2];
+// ERB - Force format stings into FLASH Memory
+#define  P(x) strcpy_P(buf, PSTR(x))
+// FLASH2 can be used where Two small (1/2 size) Buffers are needed.
+#define P2(x) strcpy_P(buf + sizeof(buf)/2, PSTR(x))
+
+
+// PROGMEM is used to avoid using the small available variable space
+const prog_uint32_t bandLimits[] PROGMEM = {  // Lower and Upper Band Limits
+      1800000UL,  2000000UL, // 160m
+      3500000UL,  4000000UL, //  80m
+      7000000UL,  7300000UL, //  40m
+     10100000UL, 10150000UL, //  30m
+     14000000UL, 14350000UL, //  20m
+     18068000UL, 18168000UL, //  17m
+     21000000UL, 21450000UL, //  15m
+     24890000UL, 24990000UL, //  12m
+     28000000UL, 29700000UL, //  10m
+   };
+   
+#define BANDS (sizeof(bandLimits)/sizeof(prog_uint32_t)/2)
+
+
+unsigned char locked = 0; //the tuning can be locked: wait until Freq Stable before unlocking it
 char inTx = 0;
 char keyDown = 0;
 char isLSB = 0;
@@ -164,8 +155,6 @@ char vfoActive = VFO_A;
 /* modes */
 unsigned char isManual = 1;
 unsigned ritOn = 0;
-
-/* dds ddschip(DDS9850, 5, 6, 7, 125000000LL); */
 
 // ###############################################################################
 // ###############################################################################
@@ -184,41 +173,45 @@ void printLine2(char const *c){
     lcd.print(c);
 }
 
-// ###############################################################################
-void displayFrequency(unsigned long f){
-  int mhz, khz, hz;
+// Print LCD Line1 with Clear to End of Line
+void printLine1CEL(char const *c){
+    char lbuf[LCD_COL+2];
+    sprintf(lbuf, LCD_STR_CEL, c);
+    printLine1(lbuf);
+}
 
-  mhz = f / 1000000l;
-  khz = (f % 1000000l)/1000;
-  hz = f % 1000l;
-  sprintf(b, FLASH("[%02d.%03d.%03d]"), mhz, khz, hz);
-  printLine1(b);
+// Print LCD Line2 with Clear to End of Line
+void printLine2CEL(char const *c){
+    char lbuf[LCD_COL+2];
+    sprintf(lbuf, LCD_STR_CEL, c);
+    printLine2(lbuf);
 }
 
 
+// ###############################################################################
 void updateDisplay(){
   char const *vfoStatus[] = { "ERR", "RDY", "BIG", "SML" };
    
   if (refreshDisplay) {
       refreshDisplay = false;
       cursorOff();
-      sprintf(b, FLASH("%08ld"), frequency);
-      
-      // Top Line of LCD
-      sprintf(c, FLASH("%1s:%.2s.%.6s %-4.4s"),
+        
+      // Top Line of LCD    
+      sprintf(b, P("%08ld"), frequency);
+      sprintf(c, P("%1s:%.2s.%.6s %3.3s%s"),
           vfoActive == VFO_A ? "A" : "B" ,
           b,  b+2,
-          ritOn ? "RIT" : " ");
-      printLine1(c);
+          ritOn ? "RIT" : " ",
+          tune2500Mode ? "K": " ");
+      printLine1CEL(c);
       
-      // Bottom Line of LCD
-      
-      sprintf(c, FLASH("%3s%1s %2s %-8.8s"),
+      sprintf(c, P("%3s%1s %2s %3.3s"),
           isLSB ? "LSB" : "USB",
           sideBandMode > 0 ? "*" : " ",
           inTx ? "TX" : "RX",
           freqUnStable ? " " : vfoStatus[vfo->status]);
-      printLine2(c);
+      printLine2CEL(c);
+      
       
       setCursorCRM(11 - (cursorDigitPosition + (cursorDigitPosition>6) ), 0, CURSOR_MODE);
   }
@@ -301,27 +294,30 @@ void setSideband(){
 
 
 // ###############################################################################
-void setRf386BandSignal(){
+void setRf386BandSignal(unsigned long freq){
   // This setup is compatable with the Minima RF386 RF Power Amplifier
   // See: http://www.hfsignals.org/index.php/RF386
 
   // Bitbang Clock Pulses to Change PA Band Filter
   int band;
   static int prevBand;
-  static unsigned long prevFrequency;
+  static unsigned long prevFreq;
 
-  if (frequency == prevFrequency) return;
-  prevFrequency = frequency;
-  
-  band = freq2Band();
+  if (freq == prevFreq) return;
+  prevFreq = freq;
+   
+  if      (freq <  4000000UL) band = 4; //   3.5 MHz
+  else if (freq < 10200000UL) band = 3; //  7-10 MHz
+  else if (freq < 18200000UL) band = 2; // 14-18 MHz
+  else if (freq < 30000000UL) band = 1; // 21-28 MHz
+  else band = 1;
 
   //debug("Band Index = %d", band);
   
   if (band == prevBand) return;
   prevBand = band;
   
-  
-  debug(FLASH("BandI = %d"), band);
+  debug(P("BandI = %d"), band);
 
   digitalWrite(PA_BAND_CLK, 1);  // Output Reset Pulse for PA Band Filter
   delay(500);
@@ -335,23 +331,11 @@ void setRf386BandSignal(){
   }
 }
 
-// -------------------------------------------------------------------------------
-int freq2Band(){
-  
-  //debug(FLASH("Freq = %lu"), frequency);
-  
-  if (frequency <  4000000UL) return 4; //   3.5 MHz
-  if (frequency < 10200000UL) return 3; //  7-10 MHz
-  if (frequency < 18200000UL) return 2; // 14-18 MHz
-  if (frequency < 30000000UL) return 1; // 21-28 MHz
-  return 1;
-}
-
 
 // ###############################################################################
-void setBandswitch(){
+void setBandswitch(unsigned long freq){
   
-  if (frequency >= 15000000UL) {
+  if (freq >= 15000000UL) {
     digitalWrite(BAND_HI, 1);
   }
   else {
@@ -359,11 +343,11 @@ void setBandswitch(){
   }
 }
 
+
 // ###############################################################################
 void readTuningPot(){
     tuningPosition = analogRead(ANALOG_TUNING);
 }
-
 
 
 // ###############################################################################
@@ -408,12 +392,23 @@ void checkTuning() {
   
   if (cursorDigitPosition < 1) return; // Nothing to do here, Abort, Cursor is in Park position
 
-  // Compute deltaFreq based on current Cursor Position Digit
-  deltaFreq = tuningDir;
-  for (int i = cursorDigitPosition; i > 1; i-- ) deltaFreq *= 10;
+  // Select Tuning Mode; Digit or 2500 Step Mode
+  if (tune2500Mode) {
+      // Inc or Dec Freq by 2.5K, useful when tuning between SSB stations
+      cursorDigitPosition = 3;
+      deltaFreq += tuningDir * 2500;
+      
+      newFreq = (frequency / 2500) * 2500 + deltaFreq;
+  }
+  else {
+      // Compute deltaFreq based on current Cursor Position Digit
+      deltaFreq = tuningDir;
+      for (int i = cursorDigitPosition; i > 1; i-- ) deltaFreq *= 10;
   
-  newFreq = freqPrevious + deltaFreq;  // Save Least Digits Mode
-  //newFreq = (freqPrevious / abs(deltaFreq)) * abs(deltaFreq) + deltaFreq; // Zero Lesser Digits Mode 
+      newFreq = frequency + deltaFreq;  // Save Least Digits Mode
+  }
+  
+  //newFreq = (frequency / abs(deltaFreq)) * abs(deltaFreq) + deltaFreq; // Zero Lesser Digits Mode 
   if (newFreq != frequency) {
       // Update frequency if within range of limits, 
       // Avoiding Nagative underRoll of UnSigned Long, and over-run MAX_FREQ  
@@ -424,11 +419,10 @@ void checkTuning() {
       freqUnStable = 25; // Set to UnStable (non-zero) Because Freq has been changed
       tuningPositionPrevious = tuningPosition; // Set up for the next Iteration
   }
-  freqPrevious = frequency;
 }
 
 
-// ###############################################################################
+// ########################################################################-v #######
 void checkTX(){
   
   if (freqUnStable) return;
@@ -499,8 +493,6 @@ void checkCW(){
 }
 
 
-
-
 // ###############################################################################
 int btnDown(){
   int val = -1, val2 = -2;
@@ -515,9 +507,8 @@ int btnDown(){
   if (val>1000) return 0;
   // 47K Pull-up, and 4.7K switch resistors,
   // Val should be approximately = (btnN×4700)÷(47000+4700)×1023
-  //sprintf(c,"Val= %d            ", val); printLine2(c); delay(1000);  // For Debug Only
   
-  debug(FLASH("btn Val= %d"), val);
+  debug(P("btn Val= %d"), val);
   
   if (val > 350) return 7;
   if (val > 300) return 6;
@@ -541,11 +532,12 @@ void deDounceBtnRelease() {
     tuningPositionPrevious = tuningPosition;
 }
 
+
 // ###############################################################################
 void checkButton() {
   int btn;
   btn = btnDown();
-  if (btn) debug(FLASH("btn %d"), btn);
+  if (btn) debug(P("btn %d"), btn);
   
   switch (btn) {
     case 0: return; // Abort
@@ -555,9 +547,21 @@ void checkButton() {
     case 4: decodeSideBandMode(btn); break;
     case 5: decodeBandUpDown(+1); break; // Band Up
     case 6: decodeBandUpDown(-1); break; // Band Down
-    case 7: decodeAux(btn); break; // Report Un-Used as AUX Buttons
+    case 7: decodeTune2500Mode(); break; // 
+    //case 7: decodeAux(7); break; // Report Un-Used as AUX Buttons
     default: return;
   }
+}
+
+
+// ###############################################################################
+void decodeTune2500Mode() {
+    cursorDigitPosition = 3; // Set default Tuning Digit
+    tune2500Mode = !tune2500Mode;
+    if(tune2500Mode) frequency = (frequency / 2500) * 2500;
+    refreshDisplay++;
+    updateDisplay();
+    deDounceBtnRelease(); // Wait for Release
 }
 
 
@@ -581,8 +585,8 @@ void decodeBandUpDown(int dir) {
      
      case +1:  // For Band Change, Up
        for (int i = 0; i < BANDS; i++) {
-         if (frequency <= pgm_read_dword(&bands[i*2+1])) {
-           if (frequency >= pgm_read_dword(&bands[i*2])) {
+         if (frequency <= pgm_read_dword(&bandLimits[i*2+1])) {
+           if (frequency >= pgm_read_dword(&bandLimits[i*2])) {
              // Save Current Ham frequency and sideBandMode
              freqCache[i] = frequency;
              sideBandModeCache[i] = sideBandMode;
@@ -591,7 +595,6 @@ void decodeBandUpDown(int dir) {
            // Load From Next Cache
            frequency = freqCache[min(i,BANDS-1)];
            sideBandMode = sideBandModeCache[min(i,BANDS-1)];
-           freqPrevious = frequency;
            break;
          }
        }
@@ -599,8 +602,8 @@ void decodeBandUpDown(int dir) {
      
      case -1:  // For Band Change, Down
        for (int i = BANDS-1; i > 0; i--) {
-         if (frequency >= pgm_read_dword(&bands[i*2])) {
-           if (frequency <= pgm_read_dword(&bands[i*2+1])) {
+         if (frequency >= pgm_read_dword(&bandLimits[i*2])) {
+           if (frequency <= pgm_read_dword(&bandLimits[i*2+1])) {
              // Save Current Ham frequency and sideBandMode
              freqCache[i] = frequency;
              sideBandModeCache[i] = sideBandMode;
@@ -608,7 +611,6 @@ void decodeBandUpDown(int dir) {
            }
            frequency = freqCache[max(i,0)];
            sideBandMode = sideBandModeCache[max(i,0)];
-           freqPrevious = frequency;
            break;
          }
        }
@@ -622,7 +624,7 @@ void decodeBandUpDown(int dir) {
    refreshDisplay++;
    updateDisplay();
    deDounceBtnRelease(); // Wait for Release
-   refreshDisplay++;
+   //refreshDisplay++;
 }
 
 
@@ -632,13 +634,14 @@ void decodeSideBandMode(int btn) {
   sideBandMode %= 3; // Limit to Three Modes
   setSideband();
   cursorOff();
-  sprintf(c, FLASH("%-16.16s"), (char *)pgm_read_word(&sideBandText[sideBandMode]));
-  printLine2(c);
-  deDounceBtnRelease(); // Wait for Release
+  printLine2CEL((char *)pgm_read_word(&sideBandText[sideBandMode]));
   refreshDisplay++;
   updateDisplay();
+  deDounceBtnRelease(); // Wait for Release
   
 }
+
+
 // ###############################################################################
 void decodeMoveCursor(int btn) {
   
@@ -649,23 +652,23 @@ void decodeMoveCursor(int btn) {
       }
       cursorDigitPosition = min(cursorDigitPosition, 7);
       cursorDigitPosition = max(cursorDigitPosition, 0);
-      freqPrevious = frequency;
       freqUnStable = false;  // Set Freq is NOT UnStable, as it is Stable
       refreshDisplay++;
       updateDisplay();
       deDounceBtnRelease(); // Wait for Button Release
 }
 
+// -------------------------------------------------------------------------------
 void decodeAux(int btn) {
-  
   //debug("Aux %d", btn);
   cursorOff();
-  sprintf(c, FLASH("Btn: %.2d%9s"), btn, " ");
-  printLine2(c);
-  deDounceBtnRelease(); // Wait for Button Release
+  sprintf(c, P("Btn: %.2d"), btn);
+  printLine2CEL(c);
   refreshDisplay++;
   updateDisplay();
+  deDounceBtnRelease(); // Wait for Button Release
 }
+
 
 // ###############################################################################
 int getButtonPushMode(int btn) {
@@ -695,7 +698,6 @@ int getButtonPushMode(int btn) {
     return LONG_PRESS;
   }
 }
-
 
 
 // ###############################################################################
@@ -731,10 +733,8 @@ void decodeFN(int btn) {
       ritOn = 0;
       refreshDisplay++;
       updateDisplay();
-      cursorOff();
-      
-      sprintf(c, FLASH("%-16.16s"), FLASH2("VFO swap!"));
-      printLine2(c);
+      //cursorOff();
+      //printLine2CEL(P("VFO swap!"));
       break;
       
     case LONG_PRESS:
@@ -743,8 +743,7 @@ void decodeFN(int btn) {
       refreshDisplay++;
       updateDisplay();
       cursorOff();
-      sprintf(c, FLASH("%-16.16s"), FLASH2("VFO reset!"));
-      printLine2(c);
+      printLine2CEL(P("VFO reset!"));
       break;
     default:
       return;
@@ -760,36 +759,30 @@ void decodeFN(int btn) {
 // ###############################################################################
 // ###############################################################################
 
-
-// ###############################################################################
 // ###############################################################################
 void setup() {
   
   // Initialize the Serial port so that we can use it for debugging
   Serial.begin(115200);
-  debug(FLASH("Radiono - Rev: %s"), RADIONO_VERSION);
+  debug(P("Radiono - Rev: %s"), RADIONO_VERSION);
 
-  lcd.begin(16, 2);
-  printLine1(FLASH("Farhan - Minima"));
-  printLine2(FLASH("  Tranceiver"));
+  lcd.begin(LCD_COL, LCD_ROW);
+  printLine1(P("Farhan - Minima"));
+  printLine2(P("  Tranceiver"));
   delay(2000);
   
-  sprintf(c, FLASH("Radiono %s"), RADIONO_VERSION);
-  printLine1(c);
-  sprintf(c, FLASH("%-16.16s"), FLASH2("Rev: CC"));
-  printLine2(c);
+  sprintf(b, P("Radiono %s"), RADIONO_VERSION);
+  printLine1CEL(b);
+  
+  sprintf(b, P("Rev: %s"), INC_REV);
+  printLine2CEL(b);
   delay(2000);
   
   // Print just the File Name, Added by ERB
-  //sprintf(c, FLASH("F: %-13.13s"), FLASH2(__FILE__));
-  //printLine2(c);
+  //sprintf(c, P("F: %-13.13s"), P2(__FILE__));
+  //printLine2CLE(c);
   //delay(2000);
   
- 
-#ifdef RUN_TESTS
-  run_tests();
-#endif
-
 
   // The library automatically reads the factory calibration settings of your Si570
   // but it needs to know for what frequency it was calibrated for.
@@ -799,19 +792,18 @@ void setup() {
 
   if (vfo->status == SI570_ERROR) {
     // The Si570 is unreachable. Show an error for 3 seconds and continue.
-    printLine2(FLASH("Si570 comm error"));
+    printLine2CEL(P("Si570 comm error"));
     delay(3000);
   }
   
-  sprintf(c, FLASH("%-16.16s"), " ");
-  printLine2(c);
+  printLine2CEL(" ");
  
   // This will print some debugging info to the serial console.
   vfo->debugSi570();
 
   //set the initial frequency
   vfo->setFrequency(26150000L);
-
+ 
   //set up the pins
   pinMode(LSB, OUTPUT);
   pinMode(TX_RX, INPUT);
@@ -826,7 +818,7 @@ void setup() {
   digitalWrite(FBUTTON, 0); // Use an external pull-up of 47K ohm to AREF
   
   tuningPositionPrevious = tuningPosition = analogRead(ANALOG_TUNING);
-  refreshDisplay = 1;
+  refreshDisplay = +1;
 }
 
 
@@ -845,64 +837,13 @@ void loop(){
   vfo->setFrequency(frequency + IF_FREQ);
   
   setSideband();
-  setBandswitch();
-  setRf386BandSignal();
+  setBandswitch(frequency);
+  setRf386BandSignal(frequency);
 
   updateDisplay();
   
 }
 
 // ###############################################################################
-// ###############################################################################
-// ###############################################################################
-// ###############################################################################
 
-
-// ###############################################################################
-// ###############################################################################
-#ifdef RUN_TESTS
-
-bool run_tests() {
-  /* Those tests check that the Si570 libary is able to understand the
-   * register values provided and do the required math with them.
-   */
-  // Testing for thomas - si570
-  {
-    uint8_t registers[] = { 0xe1, 0xc2, 0xb5, 0x7c, 0x77, 0x70 };
-    vfo = new Si570(registers, 56320000);
-    assert(vfo->getFreqXtal() == 114347712);
-    delete(vfo);
-  }
-
-  // Testing Jerry - si570
-  {
-    uint8_t registers[] = { 0xe1, 0xc2, 0xb6, 0x36, 0xbf, 0x42 };
-    vfo = new Si570(registers, 56320000);
-    assert(vfo->getFreqXtal() == 114227856);
-    delete(vfo);
-  }
-
-  Serial.println(FLASH("Tests successful!"));
-  return true;
-}
-
-#endif
-
-// ###############################################################################
-// ###############################################################################
-// handle diagnostic informations given by assertion and abort program execution:
-void __assert(const char *__func, const char *__file, int __lineno, const char *__sexp) {
-  debug(FLASH("ASSERT FAILED - %s (%s:%i): %s"), __func, __file, __lineno, __sexp);
-  Serial.flush();
-  // Show something on the screen
-  lcd.setCursor(0, 0);
-  lcd.print(FLASH("OOPS "));
-  lcd.print(__file);
-  lcd.setCursor(0, 1);
-  lcd.print(FLASH("Line: "));
-  lcd.print(__lineno);
-  // abort program execution.
-  abort();
-}
-
-
+//End
