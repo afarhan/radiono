@@ -24,7 +24,7 @@
 
 //#define RADIONO_VERSION "0.4"
 #define RADIONO_VERSION "0.4.erb" // Modifications by: Eldon R. Brown - WA0UWH
-#define INC_REV "CD.02"           // Incremental Rev Code
+#define INC_REV "CD.02.02"           // Incremental Rev Code
 
 
 /*
@@ -204,7 +204,7 @@ void updateDisplay(){
           vfoActive == VFO_A ? "A" : "B" ,
           b,  b+2,
           inTx ? " " : ritOn ? d : " ",
-          tune2500Mode ? "K": " "
+          tune2500Mode ? "*": " "
           );
       printLine1CEL(c);
       
@@ -438,14 +438,29 @@ void checkTuning() {
 }
 
 
-// ########################################################################-v #######
+// ###############################################################################
+int inBandLimits(unsigned long freq){
+    int upper, lower = 0;
+    
+       for (int i = 0; i < BANDS; i++) {
+         lower = i * 2;
+         upper = lower + 1;
+         if (frequency >= pgm_read_dword(&bandLimits[lower]) &&
+             frequency <= pgm_read_dword(&bandLimits[upper]) ) return i;
+       }
+       return 0;
+}
+    
+    
+// ###############################################################################
 void checkTX(){
   
   if (freqUnStable) return;
 
   //we don't check for ptt when transmitting cw
-  if (cwTimeout > 0)
-    return;
+  if (cwTimeout > 0) return;
+    
+  if(!inBandLimits(frequency)) return;
     
   if (digitalRead(TX_RX) == 0 && inTx == 0){
     refreshDisplay++;
@@ -468,6 +483,8 @@ void checkCW(){
 
   if (freqUnStable) return;
 
+  if(!inBandLimits(frequency)) return;
+  
   if (keyDown == 0 && analogRead(ANALOG_KEYER) < 50){
     //switch to transmit mode if we are not already in it
     if (inTx == 0){
