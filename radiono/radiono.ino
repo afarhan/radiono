@@ -24,7 +24,7 @@
 
 //#define RADIONO_VERSION "0.4"
 #define RADIONO_VERSION "0.4.erb" // Modifications by: Eldon R. Brown - WA0UWH
-#define INC_REV "CC.12"           // Incremental Rev Code
+#define INC_REV "CC.13"           // Incremental Rev Code
 
 
 /*
@@ -558,6 +558,7 @@ void checkButton() {
 void decodeTune2500Mode() {
     cursorDigitPosition = 3; // Set default Tuning Digit
     tune2500Mode = !tune2500Mode;
+    if(tune2500Mode) frequency = (frequency / 2500) * 2500;
     refreshDisplay++;
     updateDisplay();
     deDounceBtnRelease(); // Wait for Release
