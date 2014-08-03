@@ -1,0 +1,66 @@
+
+The following circuit should be added to implement multiple switches parallel
+to the original FN Switch.
+
+--------+
+Arduino |
+        |
+    AVCC|--------+---1K---- +5V
+        |        |
+        |        = 100nF
+        |        |
+        |        v
+        |
+    AREF|----+-------+
+        |    |       |
+        |   47K      = 100nF
+        |    |       |
+        |    |       v
+        |    |
+   pin26|----+-----4K7---+---4K7---+---4K7---+---4K7---+---4K7---+---4K7---+
+        |    |           |         |         |         |         |         |
+        |   FNS          S         S         S         S         S         S
+        |    |           |         |         |         |         |         |
+    AGND|----+-----------+---------+---------+---------+---------+---------+
+        |    |
+--------+    v
+
+            "FN"       "Left"    "Right"   "SBand"    "Up"     "Down"     btn7
+           (btn1)      (btn2)    (btn3)    (btn4)    (btn5)    (btn6)    (btn7)
+
+
+Where:
+  4K7 is a 4.7K ohm resistor
+  47K is a 47K  ohm resistor
+  FNS is the original FN switch
+    S is a new switch
+    = is a capacitor
+    v is a ground and AGND
+
+  AVCC is:
+     pin 20 on ATMEGA328P-PU, check spec sheet for other packages
+     
+  AREF is:
+     pin 21 on ATMEGA328P-PU, check spec sheet for other packages
+
+  AGND is:
+     pin 22 on ATMEGA328P-PU, check spec sheet for other packages
+
+Note: The use of AVCC, AREF, and AGND with these analog circuits ensure consistance
+      decoded values for use within the Sketch.
+
+Note: To avoid ground loops, the ground sides of all Switches should be
+      connected to the same point on the FN Switch and AGND.
+
+Note: Not all switches and resistors are necessary, install only
+      the left most desired switches and resistors, the current software
+      only decodes seven switches total.
+
+When used with my Alternate Tuning Method Sketch:
+   "Left" and "Right" buttons moves the Cursor
+   "SBand" selects the Side Band Mode; "Auto SB", "USB", or "LSB".
+   "Up" and "Down" switches Ham Band, and saves the current
+
+See: http://wa0uwh.blogspot.com/search/label/Minima
+
+--
