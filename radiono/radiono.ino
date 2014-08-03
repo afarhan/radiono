@@ -24,7 +24,7 @@
 
 //#define RADIONO_VERSION "0.4"
 #define RADIONO_VERSION "0.4.erb" // Modifications by: Eldon R. Brown - WA0UWH
-#define INC_REV "CD"           // Incremental Rev Code
+#define INC_REV "CD.02"           // Incremental Rev Code
 
 
 /*
@@ -149,12 +149,12 @@ unsigned char locked = 0; //the tuning can be locked: wait until Freq Stable bef
 char inTx = 0;
 char keyDown = 0;
 char isLSB = 0;
-char isRIT = 0;
 char vfoActive = VFO_A;
 
 /* modes */
 unsigned char isManual = 1;
 unsigned ritOn = 0;
+int ritVal = 0;
 
 // ###############################################################################
 // ###############################################################################
@@ -191,25 +191,30 @@ void printLine2CEL(char const *c){
 // ###############################################################################
 void updateDisplay(){
   char const *vfoStatus[] = { "ERR", "RDY", "BIG", "SML" };
-   
+  char d[6]; // Buffer for RIT Display Value
+  
   if (refreshDisplay) {
       refreshDisplay = false;
       cursorOff();
         
-      // Top Line of LCD    
+      // Top Line of LCD
+      sprintf(d, P("%+03.3d"), ritVal);  
       sprintf(b, P("%08ld"), frequency);
-      sprintf(c, P("%1s:%.2s.%.6s %3.3s%s"),
+      sprintf(c, P("%1s:%.2s.%.6s%4.4s%s"),
           vfoActive == VFO_A ? "A" : "B" ,
           b,  b+2,
-          ritOn ? "RIT" : " ",
-          tune2500Mode ? "K": " ");
+          inTx ? " " : ritOn ? d : " ",
+          tune2500Mode ? "K": " "
+          );
       printLine1CEL(c);
       
+
       sprintf(c, P("%3s%1s %2s %3.3s"),
           isLSB ? "LSB" : "USB",
           sideBandMode > 0 ? "*" : " ",
           inTx ? "TX" : "RX",
-          freqUnStable ? " " : vfoStatus[vfo->status]);
+          freqUnStable ? " " : vfoStatus[vfo->status]
+          );
       printLine2CEL(c);
       
       
@@ -389,6 +394,17 @@ void checkTuning() {
 
   tuningDir = tuningPositionDelta < 0 ? -1 : tuningPositionDelta > 0 ? +1 : 0;  
   if (!tuningDir) return;  // If Neather Direction, Abort
+  
+  // Decode and implement RIT Tuning
+  if (ritOn) {
+      ritVal += tuningDir * 10;
+      ritVal = max(ritVal, -990);
+      ritVal = min(ritVal, 990);
+      tuningPositionPrevious = tuningPosition; // Set up for the next Iteration
+      refreshDisplay++;
+      updateDisplay();
+      return;
+  }
   
   if (cursorDigitPosition < 1) return; // Nothing to do here, Abort, Cursor is in Park position
 
@@ -717,6 +733,7 @@ void decodeFN(int btn) {
   switch (getButtonPushMode(btn)) { 
     case MOMENTARY_PRESS:
       ritOn = !ritOn;
+      ritVal = 0;
       break;
       
     case DOUBLE_PRESS:
@@ -825,6 +842,7 @@ void setup() {
 // ###############################################################################
 // ###############################################################################
 void loop(){
+    unsigned long freq;
   
   readTuningPot();
   checkTuning();
@@ -834,7 +852,9 @@ void loop(){
   checkTX();
   checkButton();
 
-  vfo->setFrequency(frequency + IF_FREQ);
+  freq = frequency;
+  if (!inTx & ritOn) freq += ritVal;
+  vfo->setFrequency(freq + IF_FREQ);
   
   setSideband();
   setBandswitch(frequency);
